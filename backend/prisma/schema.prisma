@@ -1,0 +1,34 @@
+// This is the Prisma Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  games     SaveGame[]
+}
+
+model SaveGame {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  month     Int      @default(0)
+  netWorth  Float    @default(0)
+  cash      Float    @default(0)
+  
+  // JSON Blobs for complex state to avoid over-normalization
+  businessState  Json
+  portfolioState Json
+  marketState    Json
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
