@@ -5,7 +5,14 @@ import { GameEngine } from './engine/GameEngine';
 import { GameState } from './engine/types';
 
 const app = express();
-const prisma = new PrismaClient();
+let prisma: PrismaClient | null = null;
+
+// Try to initialize Prisma, but don't block if it fails
+try {
+    prisma = new PrismaClient();
+} catch (error) {
+    console.error('Failed to initialize Prisma:', error);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -15,17 +22,20 @@ const castState = (json: any): GameState => json as unknown as GameState;
 
 // Root endpoint for testing
 app.get('/', (req: Request, res: Response) => {
-    res.json({ message: 'Capital Allocation Simulator Backend', version: '1.0.0', status: 'running' });
+    res.json({ message: 'Capital Allocation Simulator Backend', version: '1.0.0', status: 'running', prismaReady: prisma !== null });
 });
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
     console.log('⭐ Health check requested');
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), message: 'Server is running' });
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), message: 'Server is running', database: prisma ? 'available' : 'unavailable' });
 });
 
 app.post('/api/game/start', async (req: Request, res: Response) => {
     try {
+        if (!prisma) {
+            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
+        }
         const userId = req.body.userId || 'default';
         const initialState = GameEngine.getInitialState();
 
@@ -45,6 +55,9 @@ app.post('/api/game/start', async (req: Request, res: Response) => {
 
 app.get('/api/game/state/:userId', async (req: Request, res: Response) => {
     try {
+        if (!prisma) {
+            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
+        }
         const userId = req.params.userId as string;
 
         let session = await prisma.gameSession.findUnique({ where: { userId } });
@@ -65,6 +78,9 @@ app.get('/api/game/state/:userId', async (req: Request, res: Response) => {
 
 app.post('/api/game/turn', async (req: Request, res: Response) => {
     try {
+        if (!prisma) {
+            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
+        }
         const userId = req.body.userId;
         const session = await prisma.gameSession.findUnique({ where: { userId } });
 
@@ -90,6 +106,9 @@ app.post('/api/game/turn', async (req: Request, res: Response) => {
 
 app.post('/api/game/action', async (req: Request, res: Response) => {
     try {
+        if (!prisma) {
+            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
+        }
         const { userId, action, payload } = req.body;
         const session = await prisma.gameSession.findUnique({ where: { userId } });
 
@@ -272,11 +291,15 @@ const server = app.listen(PORT, async () => {
     console.log(`Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
     
     // Test database connection
-    try {
-        await prisma.$queryRaw`SELECT 1`;
-        console.log('✅ Database connection successful');
-    } catch (error) {
-        console.error('❌ Database connection failed:', error instanceof Error ? error.message : String(error));
+    if (prisma) {
+        try {
+            await prisma.$queryRaw`SELECT 1`;
+            console.log('✅ Database connection successful');
+        } catch (error) {
+            console.error('❌ Database connection failed:', error instanceof Error ? error.message : String(error));
+        }
+    } else {
+        console.warn('⚠️ Database client not initialized - will return 503 for database-dependent endpoints');
     }
 });
 
@@ -284,7 +307,9 @@ const server = app.listen(PORT, async () => {
 process.on('SIGINT', async () => {
     console.log('Shutting down gracefully...');
     server.close(async () => {
-        await prisma.$disconnect();
+        if (prisma) {
+            await prisma.$disconnect();
+        }
         process.exit(0);
     });
 });
@@ -292,7 +317,9 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
     console.log('Shutting down gracefully...');
     server.close(async () => {
-        await prisma.$disconnect();
+        if (prisma) {
+            await prisma.$disconnect();
+        }
         process.exit(0);
     });
 });
