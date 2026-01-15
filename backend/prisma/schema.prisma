@@ -8,27 +8,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+model GameSession {
   id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
-  games     SaveGame[]
-}
+  userId    String   @unique
+  
+  // The entire state machine dump
+  gameState Json 
 
-model SaveGame {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  
-  month     Int      @default(0)
-  netWorth  Float    @default(0)
-  cash      Float    @default(0)
-  
-  // JSON Blobs for complex state to avoid over-normalization
-  businessState  Json
-  portfolioState Json
-  marketState    Json
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -1,0 +1,54 @@
+name: Frontend Deploy to Spaceship
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-deploy.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+      
+      - name: Deploy to Spaceship via FTP
+        working-directory: ./frontend
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          # Install lftp for FTP deployment
+          sudo apt-get update && sudo apt-get install -y lftp
+          
+          # Upload dist folder to Spaceship via FTP
+          lftp -e "
+          set ftp:ssl-allow false
+          open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER
+          mirror -R dist/ /public_html/
+          quit
+          " || lftp -e "
+          open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER
+          mirror -R dist/ /public_html/
+          quit
+          "
