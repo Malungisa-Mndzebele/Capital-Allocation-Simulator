@@ -1,7 +1,9 @@
 import axios from 'axios';
 import type { GameState } from '../types';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = import.meta.env.PROD
+    ? 'https://capital-allocation-backend.onrender.com/api'
+    : 'http://localhost:3000/api';
 
 export const start = async (userId: string): Promise<GameState> => {
     const res = await axios.post(`${API_URL}/game/start`, { userId });
