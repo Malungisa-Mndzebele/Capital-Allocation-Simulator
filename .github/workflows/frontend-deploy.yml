@@ -45,10 +45,10 @@ jobs:
           lftp -e "
           set ftp:ssl-allow false
           open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER
-          mirror -R dist/ /public_html/world/
+          mirror -R dist/ /
           quit
           " || lftp -e "
           open -u $FTP_USERNAME,$FTP_PASSWORD $FTP_SERVER
-          mirror -R dist/ /public_html/world/
+          mirror -R dist/ /
           quit
           "
