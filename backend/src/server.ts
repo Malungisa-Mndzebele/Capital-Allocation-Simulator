@@ -260,10 +260,18 @@ app.use((req: Request, res: Response) => {
     res.status(404).json({ error: 'Not Found', path: req.path });
 });
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
+    
+    // Test database connection
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        console.log('✅ Database connection successful');
+    } catch (error) {
+        console.error('❌ Database connection failed:', error instanceof Error ? error.message : String(error));
+    }
 });
 
 // Graceful shutdown
