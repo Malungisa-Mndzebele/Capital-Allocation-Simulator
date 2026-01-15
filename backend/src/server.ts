@@ -255,6 +255,11 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     });
 });
 
+// Catch 404 and forward to error handler
+app.use((req: Request, res: Response) => {
+    res.status(404).json({ error: 'Not Found', path: req.path });
+});
+
 const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
