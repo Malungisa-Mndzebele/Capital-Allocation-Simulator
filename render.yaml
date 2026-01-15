@@ -2,12 +2,21 @@ services:
   - type: web
     name: capital-allocation-backend
     env: node
+    region: ohio
+    plan: free
     buildCommand: cd backend && npm install && npx prisma generate && npm run build
     startCommand: cd backend && npm start
     branch: main
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: capital-allocation-db
+          property: connectionString
       - key: PORT
-        value: 3000
+        value: 10000
+
+databases:
+  - name: capital-allocation-db
+    databaseName: capitalallocator
+    user: admin
     plan: free
