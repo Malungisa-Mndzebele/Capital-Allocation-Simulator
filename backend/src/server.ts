@@ -15,7 +15,8 @@ const castState = (json: any): GameState => json as unknown as GameState;
 
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    console.log('⭐ Health check requested');
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), message: 'Server is running' });
 });
 
 app.post('/api/game/start', async (req: Request, res: Response) => {
