@@ -13,6 +13,11 @@ app.use(express.json());
 // Helper to ensure state matches Expected Type (Prisma Json is basic object)
 const castState = (json: any): GameState => json as unknown as GameState;
 
+// Root endpoint for testing
+app.get('/', (req: Request, res: Response) => {
+    res.json({ message: 'Capital Allocation Simulator Backend', version: '1.0.0', status: 'running' });
+});
+
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
     console.log('⭐ Health check requested');
