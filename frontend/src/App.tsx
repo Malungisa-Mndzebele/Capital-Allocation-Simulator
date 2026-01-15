@@ -133,12 +133,7 @@ function App() {
         portfolio,
         events,
         cash,
-        netWorth,
-        player,
-        lifestyle,
-        level,
-        month,
-        career
+        netWorth
     } = gameState || {} as GameState; // Fallback to avoid destructuring null during initial render (though guarded below)
 
     const handleNextTurn = async () => {
