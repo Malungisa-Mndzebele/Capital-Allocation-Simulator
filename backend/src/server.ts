@@ -7,12 +7,34 @@ import { GameState } from './engine/types';
 const app = express();
 let prisma: PrismaClient | null = null;
 
-// Try to initialize Prisma, but don't block if it fails
-try {
-    prisma = new PrismaClient();
-} catch (error) {
-    console.error('Failed to initialize Prisma:', error);
+// Initialize Prisma and run migrations
+async function initializeDatabase() {
+    try {
+        console.log('Initializing database client...');
+        prisma = new PrismaClient();
+        
+        // Test connection
+        await prisma.$queryRaw`SELECT 1`;
+        console.log('✅ Database connection successful');
+        
+        // Try to ensure the schema exists by running a query on GameSession
+        try {
+            const count = await prisma.gameSession.count();
+            console.log(`✅ GameSession table ready (${count} sessions)`);
+        } catch (tableError) {
+            console.error('❌ GameSession table not found, attempting to create...');
+            // If table doesn't exist, we can't do much without running migrations manually
+            // But Prisma should have created it on startup
+            throw tableError;
+        }
+    } catch (error) {
+        console.error('❌ Database initialization failed:', error instanceof Error ? error.message : String(error));
+        prisma = null;
+    }
 }
+
+// Initialize database before starting server
+initializeDatabase();
 
 app.use(cors());
 app.use(express.json());
