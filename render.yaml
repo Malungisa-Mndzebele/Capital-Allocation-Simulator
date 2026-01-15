@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: capital-allocation-backend
+    env: node
+    buildCommand: cd backend && npm install && npx prisma generate && npm run build
+    startCommand: cd backend && npm start
+    branch: main
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PORT
+        value: 3000
+    plan: free
