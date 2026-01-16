@@ -21,13 +21,27 @@ async function initializeDatabase() {
             await prisma.$queryRaw`SELECT 1`;
             console.log('✅ Database connection successful!');
             
+            // Run migrations to ensure schema exists
+            try {
+                console.log('🔄 Running migrations...');
+                const { execSync } = require('child_process');
+                execSync('npx prisma migrate deploy --skip-generate', { 
+                    stdio: 'inherit',
+                    cwd: __dirname + '/..'
+                });
+                console.log('✅ Migrations completed');
+            } catch (migrationError) {
+                console.error('⚠️  Migration error (may already be up to date):', migrationError instanceof Error ? migrationError.message : String(migrationError));
+                // Don't block - migrations might already be applied
+            }
+            
             // Try to ensure the schema exists by running a query on GameSession
             try {
                 const count = await prisma.gameSession.count();
                 console.log(`✅ GameSession table ready (${count} sessions)`);
             } catch (tableError) {
-                console.error('❌ GameSession table not found, but server will return 503 for database operations');
-                // Don't throw - just warn
+                console.error('❌ GameSession table not found');
+                throw tableError;
             }
             return; // Success - exit
         } catch (error) {
