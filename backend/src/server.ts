@@ -3,7 +3,6 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { GameEngine } from './engine/GameEngine';
 import { GameState } from './engine/types';
-import { execSync } from 'child_process';
 
 const app = express();
 let prisma: PrismaClient | null = null;
@@ -22,25 +21,12 @@ async function initializeDatabase() {
             await prisma.$queryRaw`SELECT 1`;
             console.log('✅ Database connection successful!');
             
-            // Run migrations to ensure schema exists
-            try {
-                console.log('🔄 Running migrations...');
-                execSync('npx prisma migrate deploy --skip-generate', { 
-                    cwd: __dirname + '/..',
-                    stdio: ['pipe', 'pipe', 'pipe']
-                });
-                console.log('✅ Migrations completed');
-            } catch (migrationError) {
-                console.error('⚠️  Migration error:', migrationError instanceof Error ? migrationError.message : String(migrationError));
-                // Don't block - migrations might already be applied
-            }
-            
-            // Try to ensure the schema exists by running a query on GameSession
+            // Verify table exists (migrations should have run at build time)
             try {
                 const count = await prisma.gameSession.count();
                 console.log(`✅ GameSession table ready (${count} sessions)`);
             } catch (tableError) {
-                console.error('❌ GameSession table not found');
+                console.error('⚠️  GameSession table may not exist yet. Retrying...');
                 throw tableError;
             }
             return; // Success - exit
