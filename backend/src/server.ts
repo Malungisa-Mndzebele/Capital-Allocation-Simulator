@@ -50,7 +50,13 @@ app.get('/', (req: Request, res: Response) => {
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
     console.log('⭐ Health check requested');
-    res.json({ status: 'ok', timestamp: new Date().toISOString(), message: 'Server is running', database: prisma ? 'available' : 'unavailable' });
+    res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(), 
+        message: 'Server is running',
+        database: prisma ? 'available' : 'unavailable',
+        version: 'v2.0-2026-01-15'
+    });
 });
 
 app.post('/api/game/start', async (req: Request, res: Response) => {
