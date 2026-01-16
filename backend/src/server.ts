@@ -7,28 +7,44 @@ import { GameState } from './engine/types';
 const app = express();
 let prisma: PrismaClient | null = null;
 
-// Initialize Prisma and run migrations
+// Initialize Prisma and run migrations with retry logic
 async function initializeDatabase() {
-    try {
-        console.log('Initializing database client...');
-        prisma = new PrismaClient();
-        
-        // Test connection
-        await prisma.$queryRaw`SELECT 1`;
-        console.log('✅ Database connection successful');
-        
-        // Try to ensure the schema exists by running a query on GameSession
+    const MAX_RETRIES = 5;
+    let retries = 0;
+    
+    while (retries < MAX_RETRIES) {
         try {
-            const count = await prisma.gameSession.count();
-            console.log(`✅ GameSession table ready (${count} sessions)`);
-        } catch (tableError) {
-            console.error('❌ GameSession table not found, but server will return 503 for database operations');
-            // Don't throw - just warn
+            console.log(`Initializing database client (attempt ${retries + 1}/${MAX_RETRIES})...`);
+            prisma = new PrismaClient();
+            
+            // Test connection
+            await prisma.$queryRaw`SELECT 1`;
+            console.log('✅ Database connection successful');
+            
+            // Try to ensure the schema exists by running a query on GameSession
+            try {
+                const count = await prisma.gameSession.count();
+                console.log(`✅ GameSession table ready (${count} sessions)`);
+            } catch (tableError) {
+                console.error('❌ GameSession table not found, but server will return 503 for database operations');
+                // Don't throw - just warn
+            }
+            return; // Success - exit
+        } catch (error) {
+            retries++;
+            console.error(`❌ Database connection attempt ${retries} failed:`, error instanceof Error ? error.message : String(error));
+            
+            if (retries < MAX_RETRIES) {
+                const waitTime = 1000 * retries; // 1s, 2s, 3s, 4s, 5s
+                console.log(`⏳ Retrying in ${waitTime}ms...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            } else {
+                console.error('❌ All database initialization attempts failed');
+                console.warn('⚠️ Server will start but database operations will fail with 503');
+                prisma = null;
+                return; // Exit after max retries
+            }
         }
-    } catch (error) {
-        console.error('❌ Database initialization failed:', error instanceof Error ? error.message : String(error));
-        console.warn('⚠️ Server will start but database operations will fail');
-        prisma = null;
     }
 }
 
