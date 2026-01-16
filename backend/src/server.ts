@@ -3,13 +3,14 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { GameEngine } from './engine/GameEngine';
 import { GameState } from './engine/types';
+import { execSync } from 'child_process';
 
 const app = express();
 let prisma: PrismaClient | null = null;
 
 // Initialize Prisma and run migrations with retry logic
 async function initializeDatabase() {
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 10; // Increased from 5
     let retries = 0;
     
     while (retries < MAX_RETRIES) {
@@ -24,14 +25,13 @@ async function initializeDatabase() {
             // Run migrations to ensure schema exists
             try {
                 console.log('🔄 Running migrations...');
-                const { execSync } = require('child_process');
                 execSync('npx prisma migrate deploy --skip-generate', { 
-                    stdio: 'inherit',
-                    cwd: __dirname + '/..'
+                    cwd: __dirname + '/..',
+                    stdio: ['pipe', 'pipe', 'pipe']
                 });
                 console.log('✅ Migrations completed');
             } catch (migrationError) {
-                console.error('⚠️  Migration error (may already be up to date):', migrationError instanceof Error ? migrationError.message : String(migrationError));
+                console.error('⚠️  Migration error:', migrationError instanceof Error ? migrationError.message : String(migrationError));
                 // Don't block - migrations might already be applied
             }
             
