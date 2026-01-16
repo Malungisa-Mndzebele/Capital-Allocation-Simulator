@@ -14,12 +14,12 @@ async function initializeDatabase() {
     
     while (retries < MAX_RETRIES) {
         try {
-            console.log(`Initializing database client (attempt ${retries + 1}/${MAX_RETRIES})...`);
+            console.log(`🔄 Initializing database client (attempt ${retries + 1}/${MAX_RETRIES})...`);
             prisma = new PrismaClient();
             
             // Test connection
             await prisma.$queryRaw`SELECT 1`;
-            console.log('✅ Database connection successful');
+            console.log('✅ Database connection successful!');
             
             // Try to ensure the schema exists by running a query on GameSession
             try {
