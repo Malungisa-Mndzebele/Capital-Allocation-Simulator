@@ -117,7 +117,14 @@ app.post('/api/game/start', async (req: Request, res: Response) => {
             return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
         }
         const userId = req.body.userId || 'default';
+        const selectedJob = req.body.selectedJob || 'Fast Food';
         const initialState = GameEngine.getInitialState();
+
+        // Set the selected job
+        initialState.career.jobTitle = selectedJob;
+        if (selectedJob === 'Fast Food') initialState.career.salary = 22000;
+        else if (selectedJob === 'Warehouse') initialState.career.salary = 26000;
+        else if (selectedJob === 'Sales') initialState.career.salary = 28000;
 
         // Upsert session
         const session = await prisma.gameSession.upsert({

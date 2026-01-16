@@ -178,8 +178,8 @@ class GameEngine {
         return {
             level: 'Career',
             month: 1,
-            cash: 0,
-            netWorth: 0,
+            cash: 2000, // Starting capital
+            netWorth: 2000,
             player: {
                 age: 17,
                 strength: 50,
