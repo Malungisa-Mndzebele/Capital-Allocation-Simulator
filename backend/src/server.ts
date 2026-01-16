@@ -22,19 +22,55 @@ async function initializeDatabase() {
             const count = await prisma.gameSession.count();
             console.log(`✅ GameSession table ready (${count} sessions)`);
         } catch (tableError) {
-            console.error('❌ GameSession table not found, attempting to create...');
-            // If table doesn't exist, we can't do much without running migrations manually
-            // But Prisma should have created it on startup
-            throw tableError;
+            console.error('❌ GameSession table not found, but server will return 503 for database operations');
+            // Don't throw - just warn
         }
     } catch (error) {
         console.error('❌ Database initialization failed:', error instanceof Error ? error.message : String(error));
+        console.warn('⚠️ Server will start but database operations will fail');
         prisma = null;
     }
 }
 
-// Initialize database before starting server
-initializeDatabase();
+// Start server after initializing database
+async function startServer() {
+    // Initialize database first
+    await initializeDatabase();
+    
+    const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
+        console.log(`✅ Server fully initialized and ready to accept requests`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGINT', async () => {
+        console.log('Shutting down gracefully...');
+        server.close(async () => {
+            if (prisma) {
+                await prisma.$disconnect();
+            }
+            process.exit(0);
+        });
+    });
+
+    process.on('SIGTERM', async () => {
+        console.log('Shutting down gracefully...');
+        server.close(async () => {
+            if (prisma) {
+                await prisma.$disconnect();
+            }
+            process.exit(0);
+        });
+    });
+}
+
+// Start the server
+startServer().catch(error => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+});
 
 app.use(cors());
 app.use(express.json());
@@ -311,43 +347,4 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 // Catch 404 and forward to error handler
 app.use((req: Request, res: Response) => {
     res.status(404).json({ error: 'Not Found', path: req.path });
-});
-
-const server = app.listen(PORT, async () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
-    
-    // Test database connection
-    if (prisma) {
-        try {
-            await prisma.$queryRaw`SELECT 1`;
-            console.log('✅ Database connection successful');
-        } catch (error) {
-            console.error('❌ Database connection failed:', error instanceof Error ? error.message : String(error));
-        }
-    } else {
-        console.warn('⚠️ Database client not initialized - will return 503 for database-dependent endpoints');
-    }
-});
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('Shutting down gracefully...');
-    server.close(async () => {
-        if (prisma) {
-            await prisma.$disconnect();
-        }
-        process.exit(0);
-    });
-});
-
-process.on('SIGTERM', async () => {
-    console.log('Shutting down gracefully...');
-    server.close(async () => {
-        if (prisma) {
-            await prisma.$disconnect();
-        }
-        process.exit(0);
-    });
 });
