@@ -1,10 +1,11 @@
 import React from 'react';
 import type { PlayerStats, Lifestyle } from '../types';
-import { User, Zap, Brain, BookOpen, Dumbbell, Home } from 'lucide-react';
+import { User, Zap, Brain, BookOpen, Dumbbell, Home, RotateCcw } from 'lucide-react';
 
 interface PlayerSidebarProps {
     player: PlayerStats;
     lifestyle: Lifestyle;
+    onRestart?: () => void;
 }
 
 const StatBar = ({ icon, label, value, color }: any) => (
@@ -22,7 +23,7 @@ const StatBar = ({ icon, label, value, color }: any) => (
     </div>
 );
 
-export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle }) => {
+export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle, onRestart }) => {
     return (
         <div className="w-full lg:w-72 bg-[#0F1016] border-r border-white/5 p-6 flex flex-col h-full overflow-y-auto">
             <div className="flex flex-col items-center mb-8">
@@ -64,7 +65,7 @@ export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle 
                 )}
             </div>
 
-            <div className="mt-8">
+            <div className="mt-8 flex-1">
                 <h3 className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4 border-b border-white/5 pb-2">Family</h3>
                 <div className="space-y-2 text-sm text-gray-300">
                     <div className="flex justify-between items-center">
@@ -98,6 +99,17 @@ export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle 
                     )}
                 </div>
             </div>
+
+            {onRestart && (
+                <div className="mt-8 pt-4 border-t border-white/5">
+                    <button
+                        onClick={onRestart}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 rounded-lg text-sm font-bold transition-all text-center"
+                    >
+                        <RotateCcw size={14} /> RESTART GAME
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

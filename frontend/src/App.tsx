@@ -219,6 +219,17 @@ function App() {
     };
 
 
+    const handleRestart = async () => {
+        if (!confirm("Are you sure you want to restart the game? current progress will be lost.")) return;
+        try {
+            const newState = await performAction(userId, { type: 'RESET' });
+            setGameState(newState);
+            // If we were in game over state, this resets it
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     if (loading) return <div className="min-h-screen bg-black text-blue-500 flex items-center justify-center font-mono animate-pulse">INITIALIZING SYSTEM...</div>
     if (!gameState) return <div className="min-h-screen bg-black text-red-500 flex items-center justify-center font-mono">CONNECTION FAILURE</div>
 
@@ -232,7 +243,7 @@ function App() {
                     Final Net Worth: {formatCurrency(gameState.netWorth)} <br />
                     Age: {gameState.player.age}
                 </div>
-                <button onClick={() => window.location.reload()} className="mt-8 px-8 py-3 bg-white text-black font-bold rounded hover:bg-gray-200">
+                <button onClick={handleRestart} className="mt-8 px-8 py-3 bg-white text-black font-bold rounded hover:bg-gray-200">
                     RESTART SIMULATION
                 </button>
             </div>
@@ -243,7 +254,7 @@ function App() {
     return (
         <div className="flex h-screen bg-[#0a0b14] text-gray-100 font-sans selection:bg-blue-500/30 overflow-hidden">
             {/* Sidebar (Always Visible) */}
-            <PlayerSidebar player={gameState.player} lifestyle={gameState.lifestyle} />
+            <PlayerSidebar player={gameState.player} lifestyle={gameState.lifestyle} onRestart={handleRestart} />
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
