@@ -224,6 +224,8 @@ function App() {
         try {
             const newState = await performAction(userId, { type: 'RESET' });
             setGameState(newState);
+            setShowLifestyleSelector(false);
+            setShowBusinessSelector(false);
             // If we were in game over state, this resets it
         } catch (e) {
             console.error(e);
@@ -514,6 +516,15 @@ function App() {
                                 <div className="font-bold text-lg text-purple-400 mb-1">Luxury</div>
                                 <div className="text-2xl font-mono text-white mb-2">$5,700<span className="text-xs text-gray-500">/mo</span></div>
                                 <div className="text-xs text-gray-400 leading-relaxed">Penthouse, eating out, sports car. <br /><span className="text-purple-400">++Energy/Happ</span></div>
+                            </button>
+                        </div>
+
+                        <div className="mt-8 pt-4 border-t border-white/5 flex justify-center">
+                            <button
+                                onClick={handleRestart}
+                                className="text-red-500 hover:text-red-400 font-bold transition-colors flex items-center gap-2"
+                            >
+                                <Skull size={16} /> RESET GAME SAVE
                             </button>
                         </div>
                     </div>
