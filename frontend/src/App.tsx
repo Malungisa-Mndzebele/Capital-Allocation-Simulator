@@ -139,6 +139,12 @@ function App() {
     const handleNextTurn = async () => {
         if (!gameState) return;
         if (gameState.gameOver) return; // No moves after game over
+
+        // Prevent turn if pending decisions exist
+        if (gameState.career.pendingDecisions && gameState.career.pendingDecisions.length > 0) {
+            return;
+        }
+
         setProcessing(true);
 
         setTimeout(async () => {

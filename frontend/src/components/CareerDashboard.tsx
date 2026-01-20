@@ -51,7 +51,7 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onT
                 <>
                     {/* PENDING DECISIONS */}
                     {career?.pendingDecisions?.length > 0 && (
-                        <div className="w-full glass-card p-6 border border-yellow-500/30 bg-yellow-500/5 animate-pulse mb-6">
+                        <div className="w-full glass-card p-6 border border-yellow-500/30 bg-yellow-500/5 mb-6 relative z-10">
                             <div className="flex items-center gap-2 text-yellow-400 mb-4">
                                 <AlertCircle size={24} />
                                 <h2 className="text-xl font-bold uppercase tracking-widest">Life Decisions</h2>
@@ -211,9 +211,17 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onT
                     {/* Main Turn Projector */}
                     <button
                         onClick={onNextMonth}
-                        className="mt-4 w-full py-6 text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 rounded-xl shadow-2xl border border-white/10 transition-all transform hover:scale-[1.01] active:scale-[0.99]"
+                        disabled={career?.pendingDecisions?.length > 0}
+                        className={`mt-4 w-full py-6 text-xl font-bold rounded-xl shadow-2xl border border-white/10 transition-all transform ${career?.pendingDecisions?.length > 0
+                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
+                            : 'bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 hover:scale-[1.01] active:scale-[0.99]'
+                            }`}
                     >
-                        PROCESS MONTH {month} <ArrowRight className="inline ml-2" size={24} />
+                        {career?.pendingDecisions?.length > 0 ? (
+                            <span className="flex items-center justify-center gap-2"><AlertCircle size={24} /> DECISION REQUIRED</span>
+                        ) : (
+                            <>PROCESS MONTH {month} <ArrowRight className="inline ml-2" size={24} /></>
+                        )}
                     </button>
                 </>
             )}
