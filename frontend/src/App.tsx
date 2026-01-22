@@ -141,7 +141,8 @@ function App() {
         if (gameState.gameOver) return; // No moves after game over
 
         // Prevent turn if pending decisions exist
-        if (gameState.career.pendingDecisions && gameState.career.pendingDecisions.length > 0) {
+        if ((gameState.career.pendingDecisions && gameState.career.pendingDecisions.length > 0) ||
+            (gameState.business.pendingDecisions && gameState.business.pendingDecisions.length > 0)) {
             return;
         }
 
@@ -350,7 +351,7 @@ function App() {
 
                                     {/* Pending Decisions Section */}
                                     {business?.pendingDecisions?.length > 0 && (
-                                        <div className="glass-card p-4 border border-yellow-500/30 bg-yellow-500/5 animate-pulse">
+                                        <div className="glass-card p-4 border border-yellow-500/30 bg-yellow-500/5 relative z-10">
                                             <div className="flex items-center gap-2 text-yellow-500 mb-2">
                                                 <AlertCircle size={20} />
                                                 <h3 className="font-bold">Decisions Required ({business.pendingDecisions.length})</h3>
@@ -443,10 +444,16 @@ function App() {
 
                                     <button
                                         onClick={handleNextTurn}
-                                        disabled={processing}
-                                        className="mt-6 w-full py-4 text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-xl shadow-lg shadow-emerald-500/20 transform hover:-translate-y-1 transition-all disabled:opacity-50 disabled:transform-none flex items-center justify-center gap-3">
+                                        disabled={processing || (business?.pendingDecisions?.length > 0)}
+                                        className={`mt-6 w-full py-4 text-xl font-bold rounded-xl shadow-lg transform transition-all flex items-center justify-center gap-3 ${(business?.pendingDecisions?.length > 0)
+                                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50 shadow-none'
+                                            : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white hover:-translate-y-1 shadow-emerald-500/20'
+                                            }`}
+                                    >
                                         {processing ? (
                                             <>Processing <span className="animate-spin">⟳</span></>
+                                        ) : (business?.pendingDecisions?.length > 0) ? (
+                                            <><AlertCircle size={24} /> DECISIONS REQUIRED</>
                                         ) : (
                                             <>PROCESS MONTH <ArrowUpRight strokeWidth={3} /></>
                                         )}
