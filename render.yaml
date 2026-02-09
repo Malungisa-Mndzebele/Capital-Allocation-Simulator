@@ -8,7 +8,9 @@ services:
     branch: main
     envVars:
       - key: DATABASE_URL
-        value: postgresql://admin:LZUrmxSPMboS4mAtBHmQJFuLukP7nheo@dpg-d5k3g1ur433s73ehsd80-a.oregon-postgres.render.com/capitalallocator
+        fromDatabase:
+          name: capital-allocation-db
+          property: connectionString
       - key: PORT
         value: 10000
 

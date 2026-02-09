@@ -66,6 +66,47 @@ export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle,
             </div>
 
             <div className="mt-8 flex-1">
+                <h3 className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4 border-b border-white/5 pb-2">Personality</h3>
+                <div className="space-y-3 text-xs">
+                    <div className="flex justify-between items-center group relative">
+                        <span className="text-gray-400">Risk Tolerance</span>
+                        <span className="font-mono text-white">{player.riskTolerance.toFixed(0)}</span>
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 w-48 z-10">
+                            Affects investment returns. Increases when buying stocks or taking loans.
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center group relative">
+                        <span className="text-gray-400">Work Ethic</span>
+                        <span className="font-mono text-white">{player.workEthic.toFixed(0)}</span>
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 w-48 z-10">
+                            Affects promotion chances. Increases when studying or working hard.
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center group relative">
+                        <span className="text-gray-400">Social Skills</span>
+                        <span className="font-mono text-white">{player.socialSkills.toFixed(0)}</span>
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 w-48 z-10">
+                            Affects negotiation and promotions. Increases through relationships.
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center group relative">
+                        <span className="text-gray-400">Creativity</span>
+                        <span className="font-mono text-white">{player.creativity.toFixed(0)}</span>
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 w-48 z-10">
+                            Affects business innovation. Increases when starting businesses.
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center group relative">
+                        <span className="text-gray-400">Discipline</span>
+                        <span className="font-mono text-white">{player.discipline.toFixed(0)}</span>
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-black/90 text-white text-xs rounded px-2 py-1 w-48 z-10">
+                            Affects study speed. Increases when paying off loans early.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-8">
                 <h3 className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4 border-b border-white/5 pb-2">Family</h3>
                 <div className="space-y-2 text-sm text-gray-300">
                     <div className="flex justify-between items-center">

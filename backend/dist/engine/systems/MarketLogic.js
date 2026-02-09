@@ -7,8 +7,8 @@ class MarketLogic {
         // 1. Cycle Progression
         // Simple random chance to switch cycles
         const roll = Math.random();
-        // 5% chance to change state
-        if (roll < 0.05) {
+        // 15% chance to change state (faster economic cycles)
+        if (roll < 0.15) {
             switch (state.cycleStage) {
                 case 'Recovery':
                     newState.cycleStage = 'Peak';
@@ -47,6 +47,12 @@ class MarketLogic {
         if (newState.interestRate > 0.05)
             marketMove -= 0.01;
         newState.stockMarketIndex = newState.stockMarketIndex * (1 + marketMove);
+        // Market correction: prevent unbounded growth
+        if (newState.stockMarketIndex > 3000) {
+            // Force correction if index gets too high
+            newState.stockMarketIndex *= 0.85; // 15% correction
+            newState.cycleStage = 'Recession';
+        }
         // 4. Inflation
         if (newState.cycleStage === 'Peak')
             newState.inflationRate = 0.05;

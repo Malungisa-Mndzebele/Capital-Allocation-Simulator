@@ -1,12 +1,19 @@
 import { CareerState } from '../types';
+import { TAX_RATE } from '../config';
 
 export class CareerLogic {
-    static processMonth(state: CareerState): CareerState {
+    static processMonth(
+        state: CareerState, 
+        playerStats?: { intelligence: number; wisdom: number; strength: number },
+        skillBonus?: number
+    ): CareerState {
         const newState = { ...state };
 
-        // 1. Study Progress
+        // 1. Study Progress (Intelligence affects study speed)
         if (newState.isStudying) {
-            newState.studyProgress += 1;
+            const intelligenceBonus = playerStats ? Math.floor((playerStats.intelligence - 50) / 25) : 0; // -2, -1, 0, 1, 2
+            const studySpeedMultiplier = 1 + (intelligenceBonus * 0.1) + (skillBonus || 0); // Intelligence + Fast Learner skill
+            newState.studyProgress += studySpeedMultiplier;
 
             // Promotion Checks
             if (newState.educationLevel === 'High School' && newState.studyProgress >= 12) {
@@ -26,12 +33,32 @@ export class CareerLogic {
                 newState.isStudying = false; // Cap
             }
         }
+        
+        // 2. Random promotion chance based on stats (if not studying)
+        if (!newState.isStudying && newState.jobTitle !== '' && newState.jobTitle !== 'Director of Operations') {
+            const wisdomBonus = playerStats ? (playerStats.wisdom - 50) / 100 : 0; // -0.5 to +0.5
+            const promotionChance = 0.02 + wisdomBonus; // 1.5% to 2.5% per month
+            
+            if (Math.random() < promotionChance) {
+                // Early promotion without degree
+                if (newState.educationLevel === 'High School' && newState.jobTitle !== 'Shift Manager') {
+                    newState.jobTitle = 'Shift Manager';
+                    newState.salary = 32000; // Slightly less than with degree
+                } else if (newState.educationLevel === 'Associate' && newState.jobTitle !== 'Regional Manager') {
+                    newState.jobTitle = 'Regional Manager';
+                    newState.salary = 50000;
+                }
+            }
+        }
 
         // Generate Random Decisions (Life/Social)
         newState.pendingDecisions = [];
 
         // 30% chance of a random event per month
-        if (Math.random() > 0.3) {
+        if (Math.random() < 0.3) {
+            const isInRelationship = newState.jobTitle !== '' && (state.jobTitle === 'Shift Manager' || state.jobTitle === 'Regional Manager' || state.jobTitle === 'Director of Operations');
+            const isSingle = true; // Will be passed from GameEngine with actual relationship status
+            
             const scenarios = [
                 {
                     title: "Friday Night Out",
@@ -53,8 +80,8 @@ export class CareerLogic {
                     title: "Gym Membership",
                     description: "Sign up for specific training?",
                     options: [
-                        { id: "join", label: "Join ($50)", cost: 50, effect: "strength:+2,health:+2" },
-                        { id: "skip", label: "Skip", cost: 0, effect: "health:-1" }
+                        { id: "join", label: "Join ($50)", cost: 50, effect: "strength:+2,energy:+2" },
+                        { id: "skip", label: "Skip", cost: 0, effect: "energy:-1" }
                     ]
                 },
                 {
@@ -66,22 +93,7 @@ export class CareerLogic {
                         { id: "ignore", label: "Ignore", cost: 0, effect: "happiness:-2" }
                     ]
                 },
-                {
-                    title: "Relationship",
-                    description: "You met someone interesting at a coffee shop.",
-                    options: [
-                        { id: "date", label: "Ask for Date ($50)", cost: 50, effect: "relationship:Dating,happiness:+20" },
-                        { id: "pass", label: "Not Ready", cost: 0, effect: "" }
-                    ]
-                },
-                {
-                    title: "Family Planning",
-                    description: "Partner suggests trying for a baby.",
-                    options: [
-                        { id: "try", label: "Agree", cost: 0, effect: "pregnancy:start" },
-                        { id: "wait", label: "Wait", cost: 0, effect: "happiness:-5" }
-                    ]
-                },
+
                 {
                     title: "Direct Help",
                     description: "Homeless person asks for food.",
@@ -123,11 +135,9 @@ export class CareerLogic {
 
     static getMonthlyNetIncome(state: CareerState): number {
         const monthlySalary = state.salary / 12;
-        const taxRate = 0.20; // Simplified flat tax
-        const netSalary = monthlySalary * (1 - taxRate);
+        const netSalary = monthlySalary * (1 - TAX_RATE);
         const tuition = state.isStudying ? state.tuitionCost : 0;
 
-        // Income = Net Salary - Living Expenses - Tuition
-        return netSalary - state.expensesLiving - tuition;
+        return netSalary - tuition;
     }
 }

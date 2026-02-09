@@ -1,27 +1,65 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { GameEngine } from './engine/GameEngine';
 import { GameState } from './engine/types';
+import {
+    SALARIES, LIFESTYLE_TIERS, BUSINESS_STARTUP_COST, BUSINESS_DEFAULTS, TUITION_COST,
+    VALID_ACTIONS, VALID_ASSET_TYPES, VALID_LIFESTYLE_TIERS, VALID_JOB_TITLES, VALID_BUSINESS_TYPES,
+    VALID_LOAN_TYPES, MAX_LOAN_AMOUNTS,
+} from './engine/config';
+import { LoanLogic } from './engine/systems/LoanLogic';
+import { PersonalityLogic } from './engine/systems/PersonalityLogic';
+import { SkillTreeLogic, SKILL_TREE } from './engine/systems/SkillTreeLogic';
+import { ChallengeMode, CHALLENGES } from './engine/systems/ChallengeMode';
+import { ScenarioMode, SCENARIOS } from './engine/systems/ScenarioMode';
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 let prisma: PrismaClient | null = null;
 
-// Initialize Prisma and run migrations with retry logic
+// --- Middleware MUST be registered before routes ---
+app.use(cors());
+app.use(express.json());
+
+// --- Validation helpers ---
+function isString(val: unknown): val is string {
+    return typeof val === 'string' && val.length > 0;
+}
+
+function isPositiveNumber(val: unknown): val is number {
+    return typeof val === 'number' && val > 0 && Number.isFinite(val);
+}
+
+function requirePrisma(res: Response): boolean {
+    if (!prisma) {
+        res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
+        return false;
+    }
+    return true;
+}
+
+// Runtime cast with basic shape check
+function castState(json: unknown): GameState {
+    const obj = json as Record<string, unknown>;
+    if (!obj || typeof obj !== 'object' || !('level' in obj) || !('month' in obj) || !('cash' in obj)) {
+        throw new Error('Invalid game state shape in database');
+    }
+    return obj as unknown as GameState;
+}
+
+// --- Database initialization with retry ---
 async function initializeDatabase() {
-    const MAX_RETRIES = 10; // Increased from 5
+    const MAX_RETRIES = 10;
     let retries = 0;
-    
+
     while (retries < MAX_RETRIES) {
         try {
             console.log(`🔄 Initializing database client (attempt ${retries + 1}/${MAX_RETRIES})...`);
             prisma = new PrismaClient();
-            
-            // Test connection
             await prisma.$queryRaw`SELECT 1`;
             console.log('✅ Database connection successful!');
-            
-            // Verify table exists (migrations should have run at build time)
+
             try {
                 const count = await prisma.gameSession.count();
                 console.log(`✅ GameSession table ready (${count} sessions)`);
@@ -29,82 +67,35 @@ async function initializeDatabase() {
                 console.error('⚠️  GameSession table may not exist yet. Retrying...');
                 throw tableError;
             }
-            return; // Success - exit
+            return;
         } catch (error) {
             retries++;
             console.error(`❌ Database connection attempt ${retries} failed:`, error instanceof Error ? error.message : String(error));
-            
+
             if (retries < MAX_RETRIES) {
-                const waitTime = 1000 * retries; // 1s, 2s, 3s, 4s, 5s
+                const waitTime = 1000 * retries;
                 console.log(`⏳ Retrying in ${waitTime}ms...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
             } else {
                 console.error('❌ All database initialization attempts failed');
                 console.warn('⚠️ Server will start but database operations will fail with 503');
                 prisma = null;
-                return; // Exit after max retries
+                return;
             }
         }
     }
 }
 
-// Start server after initializing database
-async function startServer() {
-    // Initialize database first
-    await initializeDatabase();
-    
-    const server = app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-        console.log(`Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
-        console.log(`✅ Server fully initialized and ready to accept requests`);
-    });
+// --- Routes ---
 
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-        console.log('Shutting down gracefully...');
-        server.close(async () => {
-            if (prisma) {
-                await prisma.$disconnect();
-            }
-            process.exit(0);
-        });
-    });
-
-    process.on('SIGTERM', async () => {
-        console.log('Shutting down gracefully...');
-        server.close(async () => {
-            if (prisma) {
-                await prisma.$disconnect();
-            }
-            process.exit(0);
-        });
-    });
-}
-
-// Start the server
-startServer().catch(error => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-});
-
-app.use(cors());
-app.use(express.json());
-
-// Helper to ensure state matches Expected Type (Prisma Json is basic object)
-const castState = (json: any): GameState => json as unknown as GameState;
-
-// Root endpoint for testing
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
     res.json({ message: 'Capital Allocation Simulator Backend', version: '1.0.0', status: 'running', prismaReady: prisma !== null });
 });
 
-// Health check endpoint
-app.get('/api/health', (req: Request, res: Response) => {
-    console.log('⭐ Health check requested');
-    res.json({ 
-        status: 'ok', 
-        timestamp: new Date().toISOString(), 
+app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
         message: 'Server is running',
         database: prisma ? 'available' : 'unavailable',
         version: 'v2.0-2026-01-15'
@@ -113,27 +104,20 @@ app.get('/api/health', (req: Request, res: Response) => {
 
 app.post('/api/game/start', async (req: Request, res: Response) => {
     try {
-        if (!prisma) {
-            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
-        }
+        if (!requirePrisma(res)) return;
         const userId = req.body.userId || 'default';
-        const selectedJob = req.body.selectedJob || 'Fast Food';
-        const initialState = GameEngine.getInitialState();
-
-        // Set the selected job
-        initialState.career.jobTitle = selectedJob;
-        if (selectedJob === 'Fast Food') initialState.career.salary = 22000;
-        else if (selectedJob === 'Warehouse') initialState.career.salary = 26000;
-        else if (selectedJob === 'Sales') initialState.career.salary = 28000;
-
-        // Upsert session
-        const session = await prisma.gameSession.upsert({
+        const difficulty = req.body.difficulty || 'Normal';
+        
+        if (!['Easy', 'Normal', 'Hard'].includes(difficulty)) {
+            return res.status(400).json({ error: 'Invalid difficulty. Must be Easy, Normal, or Hard' });
+        }
+        
+        const initialState = GameEngine.getInitialState(difficulty as any);
+        res.json((await prisma!.gameSession.upsert({
             where: { userId },
             update: { gameState: initialState as any },
             create: { userId, gameState: initialState as any }
-        });
-
-        res.json(session.gameState);
+        })).gameState);
     } catch (error) {
         console.error('Error in /api/game/start:', error);
         res.status(500).json({ error: 'Failed to start game', details: error instanceof Error ? error.message : String(error) });
@@ -142,20 +126,14 @@ app.post('/api/game/start', async (req: Request, res: Response) => {
 
 app.get('/api/game/state/:userId', async (req: Request, res: Response) => {
     try {
-        if (!prisma) {
-            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
-        }
+        if (!requirePrisma(res)) return;
         const userId = req.params.userId as string;
 
-        let session = await prisma.gameSession.findUnique({ where: { userId } });
-
+        let session = await prisma!.gameSession.findUnique({ where: { userId } });
         if (!session) {
             const initialState = GameEngine.getInitialState();
-            session = await prisma.gameSession.create({
-                data: { userId, gameState: initialState as any }
-            });
+            session = await prisma!.gameSession.create({ data: { userId, gameState: initialState as any } });
         }
-
         res.json(session.gameState);
     } catch (error) {
         console.error('Error in /api/game/state:', error);
@@ -165,26 +143,23 @@ app.get('/api/game/state/:userId', async (req: Request, res: Response) => {
 
 app.post('/api/game/turn', async (req: Request, res: Response) => {
     try {
-        if (!prisma) {
-            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
-        }
+        if (!requirePrisma(res)) return;
         const userId = req.body.userId;
-        const session = await prisma.gameSession.findUnique({ where: { userId } });
-
-        if (!session) {
-            res.status(404).json({ error: "Game not found" });
-            return;
+        if (!isString(userId)) {
+            return res.status(400).json({ error: 'userId is required' });
         }
+
+        const session = await prisma!.gameSession.findUnique({ where: { userId } });
+        if (!session) { res.status(404).json({ error: 'Game not found' }); return; }
 
         const currentState = castState(session.gameState);
         const newState = GameEngine.processTurn(currentState);
 
-        const updatedSession = await prisma.gameSession.update({
+        const updated = await prisma!.gameSession.update({
             where: { userId },
             data: { gameState: newState as any }
         });
-
-        res.json(updatedSession.gameState);
+        res.json(updated.gameState);
     } catch (error) {
         console.error('Error in /api/game/turn:', error);
         res.status(500).json({ error: 'Failed to process turn', details: error instanceof Error ? error.message : String(error) });
@@ -193,162 +168,400 @@ app.post('/api/game/turn', async (req: Request, res: Response) => {
 
 app.post('/api/game/action', async (req: Request, res: Response) => {
     try {
-        if (!prisma) {
-            return res.status(503).json({ error: 'Database not available', details: 'Prisma client failed to initialize' });
-        }
-        const { userId, action, payload } = req.body;
-        const session = await prisma.gameSession.findUnique({ where: { userId } });
+        if (!requirePrisma(res)) return;
 
-        if (!session) return res.status(404).json({ error: "No game" });
+        const { userId, action, payload } = req.body;
+
+        // --- Input validation ---
+        if (!isString(userId)) {
+            return res.status(400).json({ error: 'userId is required' });
+        }
+        if (!isString(action) || !(VALID_ACTIONS as readonly string[]).includes(action)) {
+            return res.status(400).json({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` });
+        }
+
+        const session = await prisma!.gameSession.findUnique({ where: { userId } });
+        if (!session) return res.status(404).json({ error: 'No game' });
 
         const state = castState(session.gameState);
-
-        // --- PLAYER ACTIONS ---
-        if (action === 'RESET') {
-            const newState = GameEngine.getInitialState();
-            const updated = await prisma.gameSession.update({
-                where: { userId },
-                data: { gameState: newState as any }
-            });
-            return res.json(updated.gameState);
-        }
-
-        if (action === 'UPDATE_LIFESTYLE') {
-            const { tier } = payload;
-            if (tier === 'Frugal') {
-                state.lifestyle = { ...state.lifestyle, tier: 'Frugal', rent: 800, food: 300, transport: 100, entertainment: 0 };
-            } else if (tier === 'Moderate') {
-                state.lifestyle = { ...state.lifestyle, tier: 'Moderate', rent: 1500, food: 600, transport: 300, entertainment: 200 };
-            } else if (tier === 'Luxury') {
-                state.lifestyle = { ...state.lifestyle, tier: 'Luxury', rent: 3000, food: 1200, transport: 500, entertainment: 1000 };
+        
+        // --- Challenge Mode Validation ---
+        if (state.activeChallenge && action !== 'RESET' && action !== 'START_CHALLENGE' && action !== 'START_SCENARIO') {
+            const challenge = CHALLENGES.find(c => c.id === state.activeChallenge);
+            if (challenge) {
+                const validation = ChallengeMode.validateAction(challenge, action, payload, state);
+                if (!validation.valid) {
+                    return res.status(400).json({ error: validation.reason });
+                }
             }
         }
 
-        if (action === 'MAKE_DECISION') {
-            const { decisionId, optionId } = payload;
+        // --- RESET ---
+        if (action === 'RESET') {
+            const difficulty = payload?.difficulty || 'Normal';
+            if (!['Easy', 'Normal', 'Hard'].includes(difficulty)) {
+                return res.status(400).json({ error: 'Invalid difficulty' });
+            }
+            const newState = GameEngine.getInitialState(difficulty as any);
+            const updated = await prisma!.gameSession.update({ where: { userId }, data: { gameState: newState as any } });
+            return res.json(updated.gameState);
+        }
 
-            // Check Career Pending Decisions
-            // Ensure pendingDecisions exists
+        // --- UPDATE_LIFESTYLE ---
+        if (action === 'UPDATE_LIFESTYLE') {
+            const tier = payload?.tier;
+            if (!isString(tier) || !(VALID_LIFESTYLE_TIERS as readonly string[]).includes(tier)) {
+                return res.status(400).json({ error: `Invalid tier. Must be one of: ${VALID_LIFESTYLE_TIERS.join(', ')}` });
+            }
+            const costs = LIFESTYLE_TIERS[tier];
+            state.lifestyle = { ...state.lifestyle, tier: tier as any, ...costs };
+        }
+
+        // --- MAKE_DECISION ---
+        if (action === 'MAKE_DECISION') {
+            const decisionId = payload?.decisionId;
+            const optionId = payload?.optionId;
+            if (!isString(decisionId) || !isString(optionId)) {
+                return res.status(400).json({ error: 'decisionId and optionId are required' });
+            }
+
             if (!state.career.pendingDecisions) state.career.pendingDecisions = [];
 
-            const decisionIndex = state.career.pendingDecisions.findIndex((d: any) => d.id === decisionId);
-            if (decisionIndex !== -1) {
-                const decision = state.career.pendingDecisions[decisionIndex];
+            // Search career decisions first, then business decisions
+            let decisionIndex = state.career.pendingDecisions.findIndex((d: any) => d.id === decisionId);
+            let decisionSource: 'career' | 'business' = 'career';
+
+            if (decisionIndex === -1 && state.business.pendingDecisions) {
+                decisionIndex = state.business.pendingDecisions.findIndex((d: any) => d.id === decisionId);
+                decisionSource = 'business';
+            }
+
+            const decisions = decisionSource === 'career' ? state.career.pendingDecisions : state.business.pendingDecisions;
+
+            if (decisionIndex !== -1 && decisions) {
+                const decision = decisions[decisionIndex];
                 const option = decision.options.find((o: any) => o.id === optionId);
 
                 if (option) {
-                    // Apply Cost
+                    // Validate player can afford the decision
+                    if (option.cost > 0 && state.cash < option.cost) {
+                        return res.status(400).json({ error: 'Insufficient cash for this decision' });
+                    }
                     state.cash -= option.cost;
-                    state.netWorth -= option.cost;
 
-                    // Parse Effects
                     if (option.effect) {
                         const effects = option.effect.split(',');
                         effects.forEach((eff: string) => {
                             const [stat, val] = eff.split(':');
                             const value = parseInt(val);
 
-                            // Special Action Effects
                             if (stat === 'relationship') {
                                 state.player.relationshipStatus = val as any;
-                                state.events.push({ month: state.month, description: "Relationship Status Changed", impact: `You are now ${val}` });
-                            }
-                            else if (stat === 'pregnancy') {
+                                state.events.push({ month: state.month, description: 'Relationship Status Changed', impact: `You are now ${val}` });
+                            } else if (stat === 'pregnancy') {
                                 if (val === 'start') {
                                     state.player.isPregnant = true;
-                                    state.events.push({ month: state.month, description: "Pregnancy Started", impact: "Expecting a baby in 9 months!" });
+                                    state.events.push({ month: state.month, description: 'Pregnancy Started', impact: 'Expecting a baby in 9 months!' });
                                 }
+                            } else if (stat === 'happiness') {
+                                state.player.happiness = Math.min(100, Math.max(0, state.player.happiness + value));
+                            } else if (stat === 'energy') {
+                                state.player.energy = Math.min(100, Math.max(0, state.player.energy + value));
+                            } else if (stat === 'strength') {
+                                state.player.strength = Math.min(100, Math.max(0, state.player.strength + value));
+                            } else if (stat === 'intelligence') {
+                                state.player.intelligence = Math.min(100, Math.max(0, state.player.intelligence + value));
+                            } else if (stat === 'wisdom') {
+                                state.player.wisdom = Math.min(100, Math.max(0, state.player.wisdom + value));
+                            } else if (stat === 'stress') {
+                                state.player.happiness = Math.max(0, state.player.happiness - value);
                             }
-                            // Standard Stats
-                            else if (stat === 'happiness') state.player.happiness = Math.min(100, Math.max(0, state.player.happiness + value));
-                            else if (stat === 'energy') state.player.energy = Math.min(100, Math.max(0, state.player.energy + value));
-                            else if (stat === 'strength') state.player.strength = Math.min(100, Math.max(0, state.player.strength + value));
-                            else if (stat === 'intelligence') state.player.intelligence = Math.min(100, Math.max(0, state.player.intelligence + value));
-                            else if (stat === 'wisdom') state.player.wisdom = Math.min(100, Math.max(0, state.player.wisdom + value));
-                            else if (stat === 'stress') state.player.happiness = Math.max(0, state.player.happiness - value);
+                            // Business-specific effects
+                            else if (stat === 'demand') {
+                                // parseFloat stops at %, so "+15%" becomes 15, then /100 = 0.15
+                                const pct = parseFloat(val) / 100;
+                                state.business.demand = Math.round(state.business.demand * (1 + pct));
+                            } else if (stat === 'capacity') {
+                                const pct = parseFloat(val) / 100;
+                                state.business.capacity = Math.round(state.business.capacity * (1 + pct));
+                            }
                         });
                     }
 
-                    // Remove decision
-                    state.career.pendingDecisions.splice(decisionIndex, 1);
+                    decisions.splice(decisionIndex, 1);
                 }
             }
         }
 
-        // --- LEVEL 1 ACTIONS ---
+        // --- TOGGLE_STUDY ---
         if (action === 'TOGGLE_STUDY') {
             state.career.isStudying = !state.career.isStudying;
+            state.career.tuitionCost = state.career.isStudying ? TUITION_COST : 0;
+            
+            // Update personality
+            state.player = PersonalityLogic.updatePersonality(state.player, 'TOGGLE_STUDY', { isStudying: state.career.isStudying });
         }
 
+        // --- SELECT_JOB ---
         if (action === 'SELECT_JOB') {
-            const { jobTitle } = payload;
-            const salaries: Record<string, number> = {
-                'Fast Food': 18000,
-                'Warehouse': 24000,
-                'Sales': 30000
-            };
-
+            const jobTitle = payload?.jobTitle;
+            if (!isString(jobTitle) || !(VALID_JOB_TITLES as readonly string[]).includes(jobTitle)) {
+                return res.status(400).json({ error: `Invalid job. Must be one of: ${VALID_JOB_TITLES.join(', ')}` });
+            }
             state.career.jobTitle = jobTitle;
-            state.career.salary = salaries[jobTitle] || 18000;
+            state.career.salary = SALARIES[jobTitle];
+            state.events.push({ month: state.month, description: 'CAREER STARTED', impact: `Hired as ${jobTitle} (${state.career.salary}/yr)` });
+        }
 
-            state.events.push({
-                month: state.month,
-                description: "CAREER STARTED",
-                impact: `Hired as ${jobTitle} ($${state.career.salary}/yr)`
+        // --- START_BUSINESS ---
+        if (action === 'START_BUSINESS') {
+            const businessType = payload?.businessType;
+            if (!isString(businessType) || !(VALID_BUSINESS_TYPES as readonly string[]).includes(businessType)) {
+                return res.status(400).json({ error: `Invalid business type. Must be one of: ${VALID_BUSINESS_TYPES.join(', ')}` });
+            }
+            if (state.cash < state.career.savingsGoal) {
+                return res.status(400).json({ error: 'Insufficient savings to start a business' });
+            }
+            state.level = 'Business';
+            state.cash -= BUSINESS_STARTUP_COST;
+            const defaults = BUSINESS_DEFAULTS[businessType];
+            state.business.type = businessType as any;
+            state.business.inventory = defaults.inventory;
+            state.business.capacity = defaults.capacity;
+            state.business.prices = defaults.prices;
+            state.business.demand = defaults.demand;
+            state.events.push({ month: state.month, description: 'BUSINESS LAUNCHED', impact: `You have resigned to start a ${businessType} business.` });
+            
+            // Update personality
+            state.player = PersonalityLogic.updatePersonality(state.player, 'START_BUSINESS', { businessType });
+        }
+
+        // --- BUY_ASSET ---
+        if (action === 'BUY_ASSET') {
+            const assetType = payload?.assetType;
+            const amount = payload?.amount;
+            if (!isString(assetType) || !(VALID_ASSET_TYPES as readonly string[]).includes(assetType)) {
+                return res.status(400).json({ error: `Invalid asset type. Must be one of: ${VALID_ASSET_TYPES.join(', ')}` });
+            }
+            if (!isPositiveNumber(amount)) {
+                return res.status(400).json({ error: 'amount must be a positive number' });
+            }
+            if (state.cash < amount) {
+                return res.status(400).json({ error: 'Insufficient cash' });
+            }
+            state.cash -= amount;
+            if (assetType === 'STOCK') state.portfolio.stocksValue += amount;
+            if (assetType === 'BOND') state.portfolio.bondsValue += amount;
+            if (assetType === 'REAL_ESTATE') state.portfolio.realEstateValue += amount;
+            
+            // Update personality
+            state.player = PersonalityLogic.updatePersonality(state.player, 'BUY_ASSET', { assetType });
+        }
+
+        // --- SELL_ASSET ---
+        if (action === 'SELL_ASSET') {
+            const assetType = payload?.assetType;
+            const amount = payload?.amount;
+            if (!isString(assetType) || !(VALID_ASSET_TYPES as readonly string[]).includes(assetType)) {
+                return res.status(400).json({ error: `Invalid asset type. Must be one of: ${VALID_ASSET_TYPES.join(', ')}` });
+            }
+            if (!isPositiveNumber(amount)) {
+                return res.status(400).json({ error: 'amount must be a positive number' });
+            }
+            
+            // Check if player has enough of the asset
+            let currentValue = 0;
+            if (assetType === 'STOCK') currentValue = state.portfolio.stocksValue;
+            if (assetType === 'BOND') currentValue = state.portfolio.bondsValue;
+            if (assetType === 'REAL_ESTATE') currentValue = state.portfolio.realEstateValue;
+            
+            if (currentValue < amount) {
+                return res.status(400).json({ error: 'Insufficient assets to sell' });
+            }
+            
+            // Sell with 2% transaction fee
+            const saleProceeds = amount * 0.98;
+            state.cash += saleProceeds;
+            
+            if (assetType === 'STOCK') state.portfolio.stocksValue -= amount;
+            if (assetType === 'BOND') state.portfolio.bondsValue -= amount;
+            if (assetType === 'REAL_ESTATE') state.portfolio.realEstateValue -= amount;
+            
+            state.events.push({ 
+                month: state.month, 
+                description: 'Asset Sold', 
+                impact: `Sold ${assetType} for $${saleProceeds.toFixed(0)} (2% fee)` 
             });
         }
 
-        if (action === 'START_BUSINESS') {
-            if (state.cash >= state.career.savingsGoal) {
-                const { businessType } = payload;
-                state.level = 'Business';
-                state.cash -= 10000; // Capital Injection cost
+        // --- UPDATE_BUSINESS ---
+        if (action === 'UPDATE_BUSINESS') {
+            if (payload?.prices !== undefined) {
+                if (!isPositiveNumber(payload.prices)) return res.status(400).json({ error: 'prices must be a positive number' });
+                state.business.prices = payload.prices;
+            }
+            if (payload?.staff !== undefined) {
+                if (!isPositiveNumber(payload.staff) || !Number.isInteger(payload.staff)) return res.status(400).json({ error: 'staff must be a positive integer' });
+                state.business.staff = payload.staff;
+            }
+        }
 
-                state.business.type = businessType || 'Retail';
-                if (state.business.type === 'Retail') {
-                    state.business.inventory = 2000;
-                    state.business.capacity = 2500;
-                    state.business.prices = 4;
-                } else if (state.business.type === 'Tech') {
-                    state.business.inventory = 0;
-                    state.business.capacity = 10000;
-                    state.business.prices = 29;
-                } else if (state.business.type === 'Service') {
-                    state.business.inventory = 0;
-                    state.business.capacity = 200;
-                    state.business.prices = 150;
-                }
+        // --- TAKE_LOAN ---
+        if (action === 'TAKE_LOAN') {
+            const loanType = payload?.loanType;
+            const amount = payload?.amount;
+            
+            if (!isString(loanType) || !(VALID_LOAN_TYPES as readonly string[]).includes(loanType)) {
+                return res.status(400).json({ error: `Invalid loan type. Must be one of: ${VALID_LOAN_TYPES.join(', ')}` });
+            }
+            if (!isPositiveNumber(amount)) {
+                return res.status(400).json({ error: 'amount must be a positive number' });
+            }
+            
+            const maxAmount = MAX_LOAN_AMOUNTS[loanType];
+            if (amount > maxAmount) {
+                return res.status(400).json({ error: `Maximum ${loanType} loan is $${maxAmount}` });
+            }
+            
+            // Credit score check
+            if (state.creditScore < 600) {
+                return res.status(400).json({ error: 'Credit score too low for loan approval' });
+            }
+            
+            const loan = LoanLogic.createLoan(loanType as any, amount, state.month, state.creditScore);
+            state.loans.push(loan);
+            state.cash += amount;
+            
+            state.events.push({
+                month: state.month,
+                description: 'Loan Approved',
+                impact: `${loanType} loan of $${amount.toFixed(0)} at ${(loan.interestRate * 100).toFixed(2)}% APR. Payment: $${loan.monthlyPayment.toFixed(0)}/mo`
+            });
+            
+            // Update personality
+            state.player = PersonalityLogic.updatePersonality(state.player, 'TAKE_LOAN', { loanType });
+        }
 
+        // --- PAY_LOAN ---
+        if (action === 'PAY_LOAN') {
+            const loanId = payload?.loanId;
+            const amount = payload?.amount;
+            
+            if (!isString(loanId)) {
+                return res.status(400).json({ error: 'loanId is required' });
+            }
+            if (!isPositiveNumber(amount)) {
+                return res.status(400).json({ error: 'amount must be a positive number' });
+            }
+            
+            const loan = state.loans.find(l => l.id === loanId);
+            if (!loan) {
+                return res.status(400).json({ error: 'Loan not found' });
+            }
+            
+            if (state.cash < amount) {
+                return res.status(400).json({ error: 'Insufficient cash' });
+            }
+            
+            const paymentAmount = Math.min(amount, loan.balance);
+            state.cash -= paymentAmount;
+            loan.balance -= paymentAmount;
+            
+            if (loan.balance <= 0) {
+                state.loans = state.loans.filter(l => l.id !== loanId);
                 state.events.push({
                     month: state.month,
-                    description: "BUSINESS LAUNCHED",
-                    impact: `You have resigned to start a ${state.business.type} business.`
+                    description: 'Loan Paid Off!',
+                    impact: `${loan.type} loan fully repaid early. Credit score improved.`
+                });
+                
+                // Update personality
+                state.player = PersonalityLogic.updatePersonality(state.player, 'PAY_LOAN', { extraPayment: true });
+            } else {
+                state.events.push({
+                    month: state.month,
+                    description: 'Extra Loan Payment',
+                    impact: `Paid $${paymentAmount.toFixed(0)} toward ${loan.type} loan. Remaining: $${loan.balance.toFixed(0)}`
                 });
             }
         }
 
-        // --- LEVEL 2+ ACTIONS ---
-        if (action === 'BUY_ASSET') {
-            const { assetType, amount } = payload;
-            if (state.cash >= amount) {
-                state.cash -= amount;
-                if (assetType === 'STOCK') state.portfolio.stocksValue += amount;
-                if (assetType === 'BOND') state.portfolio.bondsValue += amount;
-                if (assetType === 'REAL_ESTATE') state.portfolio.realEstateValue += amount;
+        // --- UNLOCK_SKILL ---
+        if (action === 'UNLOCK_SKILL') {
+            const skillId = payload?.skillId;
+            if (!isString(skillId)) {
+                return res.status(400).json({ error: 'skillId is required' });
+            }
+            
+            const skill = SKILL_TREE.find(s => s.id === skillId);
+            if (!skill) {
+                return res.status(400).json({ error: 'Invalid skill ID' });
+            }
+            
+            try {
+                state.skills = SkillTreeLogic.unlockSkill(skill, state.skills);
+                state.events.push({
+                    month: state.month,
+                    description: `🌟 Skill Unlocked: ${skill.name}`,
+                    impact: skill.description
+                });
+            } catch (error) {
+                return res.status(400).json({ error: error instanceof Error ? error.message : 'Cannot unlock skill' });
             }
         }
-
-        if (action === 'UPDATE_BUSINESS') {
-            if (payload.prices) state.business.prices = payload.prices;
-            if (payload.staff) state.business.staff = payload.staff;
+        
+        // --- START_CHALLENGE ---
+        if (action === 'START_CHALLENGE') {
+            const challengeId = payload?.challengeId;
+            if (!isString(challengeId)) {
+                return res.status(400).json({ error: 'challengeId is required' });
+            }
+            
+            const challenge = CHALLENGES.find(c => c.id === challengeId);
+            if (!challenge) {
+                return res.status(400).json({ error: 'Invalid challenge ID' });
+            }
+            
+            // Reset game with challenge active
+            const difficulty = payload?.difficulty || 'Normal';
+            const newState = GameEngine.getInitialState(difficulty as any);
+            newState.activeChallenge = challengeId;
+            newState.events.push({
+                month: 1,
+                description: `🎯 Challenge Started: ${challenge.name}`,
+                impact: challenge.description
+            });
+            
+            const updated = await prisma!.gameSession.update({ where: { userId }, data: { gameState: newState as any } });
+            return res.json(updated.gameState);
+        }
+        
+        // --- START_SCENARIO ---
+        if (action === 'START_SCENARIO') {
+            const scenarioId = payload?.scenarioId;
+            if (!isString(scenarioId)) {
+                return res.status(400).json({ error: 'scenarioId is required' });
+            }
+            
+            const scenario = SCENARIOS.find(s => s.id === scenarioId);
+            if (!scenario) {
+                return res.status(400).json({ error: 'Invalid scenario ID' });
+            }
+            
+            // Create base state and apply scenario
+            const baseState = GameEngine.getInitialState('Normal');
+            const newState = ScenarioMode.applyScenario(scenario, baseState);
+            newState.activeScenario = scenarioId;
+            
+            const updated = await prisma!.gameSession.update({ where: { userId }, data: { gameState: newState as any } });
+            return res.json(updated.gameState);
         }
 
         // Save back to DB
-        const updatedSession = await prisma.gameSession.update({
+        const updatedSession = await prisma!.gameSession.update({
             where: { userId },
             data: { gameState: state as any }
         });
-
         res.json(updatedSession.gameState);
     } catch (error) {
         console.error('Error in /api/game/action:', error);
@@ -356,18 +569,43 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-
-// Global error handler middleware
-app.use((err: any, req: Request, res: Response, next: any) => {
+// --- Error handlers (must be last) ---
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error('Unhandled error:', err);
-    res.status(500).json({ 
-        error: 'Internal server error', 
-        details: process.env.NODE_ENV === 'production' ? 'Unknown error' : err.message 
+    res.status(500).json({
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'production' ? 'Unknown error' : err.message
     });
 });
 
-// Catch 404 and forward to error handler
-app.use((req: Request, res: Response) => {
-    res.status(404).json({ error: 'Not Found', path: req.path });
+app.use((_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Not Found', path: _req.path });
+});
+
+// --- Start server ---
+async function startServer() {
+    await initializeDatabase();
+
+    const server = app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
+        console.log(`✅ Server fully initialized and ready to accept requests`);
+    });
+
+    const shutdown = async () => {
+        console.log('Shutting down gracefully...');
+        server.close(async () => {
+            if (prisma) await prisma.$disconnect();
+            process.exit(0);
+        });
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+}
+
+startServer().catch(error => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
 });

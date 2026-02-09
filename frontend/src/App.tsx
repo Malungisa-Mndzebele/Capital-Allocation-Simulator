@@ -18,6 +18,13 @@ import {
 } from 'lucide-react'
 import { CareerDashboard } from './components/CareerDashboard'
 import { PlayerSidebar } from './components/PlayerSidebar'
+import { SkillTree } from './components/SkillTree'
+import { NetWorthChart } from './components/NetWorthChart'
+import { VisualProgression } from './components/VisualProgression'
+import { ChallengeSelector } from './components/ChallengeSelector'
+import { ScenarioSelector } from './components/ScenarioSelector'
+import { ChallengeProgress } from './components/ChallengeProgress'
+import { ScenarioProgress } from './components/ScenarioProgress'
 
 // --- HELPER COMPONENTS ---
 
@@ -54,13 +61,24 @@ const ConfigRow = ({ label, value }: any) => (
     </div>
 );
 
-const AssetItem = ({ name, value, total, color }: any) => {
+const AssetItem = ({ name, value, total, color, onSell }: any) => {
     const percent = total > 0 ? (value / total) * 100 : 0;
+    const canSell = value > 0 && onSell;
     return (
-        <div className="p-3 rounded-lg hover:bg-white/5 transition-colors cursor-default group">
+        <div className="p-3 rounded-lg hover:bg-white/5 transition-colors group">
             <div className="flex justify-between mb-1">
                 <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{name}</span>
-                <span className="text-sm font-mono text-gray-400 group-hover:text-white transition-colors">{formatCurrency(value)}</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-mono text-gray-400 group-hover:text-white transition-colors">{formatCurrency(value)}</span>
+                    {canSell && (
+                        <button 
+                            onClick={() => onSell(Math.min(5000, value))}
+                            className="text-xs px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            Sell
+                        </button>
+                    )}
+                </div>
             </div>
             <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
                 <div className={`h-full ${color} transition-all duration-1000 ease-out`} style={{ width: `${Math.max(percent, 0)}%` }}></div>
@@ -103,6 +121,9 @@ function App() {
     const [processing, setProcessing] = useState<boolean>(false)
     const [showBusinessSelector, setShowBusinessSelector] = useState<boolean>(false)
     const [showLifestyleSelector, setShowLifestyleSelector] = useState<boolean>(false)
+    const [showChallengeSelector, setShowChallengeSelector] = useState<boolean>(false)
+    const [showScenarioSelector, setShowScenarioSelector] = useState<boolean>(false)
+    const [activeTab, setActiveTab] = useState<'game' | 'skills' | 'stats'>('game')
     const userId = "user_123"
 
     // Initialization
@@ -126,21 +147,18 @@ function App() {
     const profit = gameState?.business ? (gameState.business.revenue - gameState.business.expensesTotal) : 0;
     const isProfitable = profit > 0;
 
-    // Destructure for easier access in JSX (only safe if gameState exists)
-    const {
-        business,
-        market,
-        portfolio,
-        events,
-        cash,
-        netWorth
-    } = gameState || {} as GameState; // Fallback to avoid destructuring null during initial render (though guarded below)
+    // Safe destructuring — only used after loading guards below
+    const business = gameState?.business;
+    const market = gameState?.market;
+    const portfolio = gameState?.portfolio;
+    const events = gameState?.events;
+    const cash = gameState?.cash ?? 0;
+    const netWorth = gameState?.netWorth ?? 0;
 
     const handleNextTurn = async () => {
         if (!gameState) return;
-        if (gameState.gameOver) return; // No moves after game over
+        if (gameState.gameOver) return;
 
-        // Prevent turn if pending decisions exist
         if ((gameState.career.pendingDecisions && gameState.career.pendingDecisions.length > 0) ||
             (gameState.business.pendingDecisions && gameState.business.pendingDecisions.length > 0)) {
             return;
@@ -163,8 +181,7 @@ function App() {
     const handleToggleStudy = async () => {
         if (!gameState) return;
         try {
-            await performAction(userId, { type: 'TOGGLE_STUDY' });
-            const newState = await getGameState(userId);
+            const newState = await performAction(userId, 'TOGGLE_STUDY');
             setGameState(newState);
         } catch (e) {
             console.error(e);
@@ -174,8 +191,7 @@ function App() {
     const handleSelectJob = async (job: string) => {
         if (!gameState) return;
         try {
-            await performAction(userId, { type: 'SELECT_JOB', payload: { jobTitle: job } });
-            const newState = await getGameState(userId);
+            const newState = await performAction(userId, 'SELECT_JOB', { jobTitle: job });
             setGameState(newState);
         } catch (e) {
             console.error(e);
@@ -185,8 +201,7 @@ function App() {
     const handleMakeDecision = async (decisionId: string, optionId: string) => {
         if (!gameState) return;
         try {
-            await performAction(userId, { type: 'MAKE_DECISION', payload: { decisionId, optionId } });
-            const newState = await getGameState(userId);
+            const newState = await performAction(userId, 'MAKE_DECISION', { decisionId, optionId });
             setGameState(newState);
         } catch (e) {
             console.error(e);
@@ -196,8 +211,7 @@ function App() {
     const handleStartBusiness = async (type: string) => {
         if (!gameState) return;
         try {
-            await performAction(userId, { type: 'START_BUSINESS', businessType: type });
-            const newState = await getGameState(userId);
+            const newState = await performAction(userId, 'START_BUSINESS', { businessType: type });
             setGameState(newState);
             setShowBusinessSelector(false);
         } catch (e) {
@@ -208,8 +222,7 @@ function App() {
     const handleUpdateLifestyle = async (tier: string) => {
         if (!gameState) return;
         try {
-            await performAction(userId, { type: 'UPDATE_LIFESTYLE', payload: { tier } });
-            const newState = await getGameState(userId);
+            const newState = await performAction(userId, 'UPDATE_LIFESTYLE', { tier });
             setGameState(newState);
             setShowLifestyleSelector(false);
         } catch (e) {
@@ -221,21 +234,69 @@ function App() {
         if (!gameState) return;
         const amount = 5000;
         if (gameState.cash < amount) return;
-        const newState = await performAction(userId, { type: 'BUY_ASSET', assetType: 'STOCK', amount: amount });
-        setGameState(newState);
+        try {
+            const newState = await performAction(userId, 'BUY_ASSET', { assetType: 'STOCK', amount });
+            setGameState(newState);
+        } catch (e) {
+            console.error(e);
+        }
     };
 
+    const handleSellAsset = async (assetType: 'STOCK' | 'BOND' | 'REAL_ESTATE', amount: number) => {
+        if (!gameState) return;
+        try {
+            const newState = await performAction(userId, 'SELL_ASSET', { assetType, amount });
+            setGameState(newState);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to sell asset: ' + (e as any).response?.data?.error || 'Unknown error');
+        }
+    };
 
     const handleRestart = async () => {
         if (!confirm("Are you sure you want to restart the game? current progress will be lost.")) return;
         try {
-            const newState = await performAction(userId, { type: 'RESET' });
+            const newState = await performAction(userId, 'RESET');
             setGameState(newState);
             setShowLifestyleSelector(false);
             setShowBusinessSelector(false);
-            // If we were in game over state, this resets it
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const handleUnlockSkill = async (skillId: string) => {
+        if (!gameState) return;
+        try {
+            const newState = await performAction(userId, 'UNLOCK_SKILL', { skillId });
+            setGameState(newState);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to unlock skill: ' + (e as any).response?.data?.error || 'Unknown error');
+        }
+    };
+    
+    const handleStartChallenge = async (challengeId: string) => {
+        if (!confirm("Starting a challenge will restart your game. Continue?")) return;
+        try {
+            const newState = await performAction(userId, 'START_CHALLENGE', { challengeId, difficulty: gameState?.difficulty || 'Normal' });
+            setGameState(newState);
+            setShowChallengeSelector(false);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to start challenge: ' + (e as any).response?.data?.error || 'Unknown error');
+        }
+    };
+    
+    const handleStartScenario = async (scenarioId: string) => {
+        if (!confirm("Starting a scenario will restart your game. Continue?")) return;
+        try {
+            const newState = await performAction(userId, 'START_SCENARIO', { scenarioId });
+            setGameState(newState);
+            setShowScenarioSelector(false);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to start scenario: ' + (e as any).response?.data?.error || 'Unknown error');
         }
     };
 
@@ -247,7 +308,7 @@ function App() {
             <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-1000">
                 <Skull size={120} className="text-red-600 mb-6 animate-pulse" />
                 <h1 className="text-6xl font-black text-white mb-4 tracking-tighter">GAME OVER</h1>
-                <p className="text-xl text-red-400 font-mono mb-8 max-w-lg">{gameState.gameOverReason}</p>
+                <p className="text-xl text-red-400 font-mono mb-8 max-w-lg">{gameState.gameOverReason || 'Your journey has ended.'}</p>
                 <div className="p-4 border border-white/10 rounded bg-white/5 text-gray-400 text-sm">
                     Final Net Worth: {formatCurrency(gameState.netWorth)} <br />
                     Age: {gameState.player.age}
@@ -283,13 +344,77 @@ function App() {
                         <div className="flex items-center gap-6">
                             <NavStat label="Cash" value={gameState.cash} />
                             <NavStat label="Net Worth" value={gameState.netWorth} highlight />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowChallengeSelector(true)}
+                                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 border border-blue-500/50 rounded transition-all"
+                                >
+                                    🎯 Challenge
+                                </button>
+                                <button
+                                    onClick={() => setShowScenarioSelector(true)}
+                                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/50 rounded transition-all"
+                                >
+                                    📖 Scenario
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </nav>
 
+                {/* Tab Navigation */}
+                <div className="border-b border-white/5 bg-[#0a0b14]/90 backdrop-blur-md shrink-0">
+                    <div className="px-6 flex gap-2">
+                        <button
+                            onClick={() => setActiveTab('game')}
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
+                                activeTab === 'game'
+                                    ? 'text-blue-400 border-b-2 border-blue-400'
+                                    : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                        >
+                            Game
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('skills')}
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
+                                activeTab === 'skills'
+                                    ? 'text-blue-400 border-b-2 border-blue-400'
+                                    : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                        >
+                            Skills {gameState.skills.skillPoints > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 bg-yellow-500/30 text-yellow-400 rounded text-xs">
+                                    {gameState.skills.skillPoints}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('stats')}
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
+                                activeTab === 'stats'
+                                    ? 'text-blue-400 border-b-2 border-blue-400'
+                                    : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                        >
+                            Stats
+                        </button>
+                    </div>
+                </div>
+
                 {/* Main Scrollable Content */}
                 <main className="flex-1 overflow-y-auto p-6 md:p-8">
                     <div className="max-w-7xl mx-auto space-y-8 pb-20">
+                        {/* Challenge/Scenario Progress */}
+                        {gameState.activeChallenge && (
+                            <ChallengeProgress challengeId={gameState.activeChallenge} gameState={gameState} />
+                        )}
+                        {gameState.activeScenario && (
+                            <ScenarioProgress scenarioId={gameState.activeScenario} gameState={gameState} />
+                        )}
+                        
+                        {activeTab === 'game' && (
+                            <>
                         {gameState.level === 'Career' ? (
                             <>
                                 <CareerDashboard
@@ -314,7 +439,7 @@ function App() {
                             // BUSINESS DASHBOARD (Inline for now to save space in file)
                             <div className="grid grid-cols-12 gap-6">
                                 <div className="col-span-12 lg:col-span-4 space-y-6">
-                                    <SectionHeader icon={<TrendingUp size={18} />} title={`${business.type} Operations`} />
+                                    <SectionHeader icon={<TrendingUp size={18} />} title={`${business?.type} Operations`} />
 
                                     <div className="glass-card p-6 relative overflow-hidden group">
                                         <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -322,48 +447,48 @@ function App() {
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-y-6 gap-x-4 relative z-10">
-                                            <StatDisplay label="Revenue" value={business.revenue} type="currency" color="text-emerald-400" />
-                                            <StatDisplay label="Expenses" value={business.expensesTotal} type="currency" color="text-red-400" />
+                                            <StatDisplay label="Revenue" value={business?.revenue ?? 0} type="currency" color="text-emerald-400" />
+                                            <StatDisplay label="Expenses" value={business?.expensesTotal ?? 0} type="currency" color="text-red-400" />
 
                                             <div className="col-span-2 p-4 rounded-xl bg-black/20 border border-white/5">
                                                 <div className="flex justify-between items-end mb-1">
                                                     <span className="text-sm text-gray-400">Net Operating Profit</span>
-                                                    <PercentBadge val={((profit / business.revenue) || 0) * 100} />
+                                                    <PercentBadge val={((profit / (business?.revenue || 1)) || 0) * 100} />
                                                 </div>
                                                 <div className={`text-3xl font-mono font-bold ${isProfitable ? 'text-emerald-400 text-glow' : 'text-red-500'}`}>
                                                     {formatCurrency(profit)}
                                                 </div>
                                             </div>
 
-                                            <StatDisplay label="Customers" value={business.demand} type="number" suffix="/mo" />
-                                            <StatDisplay label="Capacity" value={business.capacity} type="number" suffix="units" />
+                                            <StatDisplay label="Customers" value={business?.demand ?? 0} type="number" suffix="/mo" />
+                                            <StatDisplay label="Capacity" value={business?.capacity ?? 0} type="number" suffix="units" />
                                         </div>
                                     </div>
 
                                     <div className="glass-card p-6">
                                         <h3 className="text-sm text-gray-400 uppercase tracking-widest font-bold mb-4">Operational Config</h3>
                                         <div className="space-y-4">
-                                            <ConfigRow label="Product Price" value={formatCurrency(business.prices)} />
-                                            <ConfigRow label="Staff Count" value={business.staff} />
-                                            <ConfigRow label="Inventory Level" value={business.inventory} />
+                                            <ConfigRow label="Product Price" value={formatCurrency(business?.prices ?? 0)} />
+                                            <ConfigRow label="Staff Count" value={business?.staff ?? 0} />
+                                            <ConfigRow label="Inventory Level" value={business?.inventory ?? 0} />
                                         </div>
                                     </div>
 
                                     {/* Pending Decisions Section */}
-                                    {business?.pendingDecisions?.length > 0 && (
+                                    {(business?.pendingDecisions?.length ?? 0) > 0 && (
                                         <div className="glass-card p-4 border border-yellow-500/30 bg-yellow-500/5 relative z-10">
                                             <div className="flex items-center gap-2 text-yellow-500 mb-2">
                                                 <AlertCircle size={20} />
-                                                <h3 className="font-bold">Decisions Required ({business.pendingDecisions.length})</h3>
+                                                <h3 className="font-bold">Decisions Required ({business!.pendingDecisions.length})</h3>
                                             </div>
                                             <div className="space-y-3">
-                                                {business.pendingDecisions.map(d => (
+                                                {business!.pendingDecisions.map(d => (
                                                     <div key={d.id} className="p-3 bg-black/40 rounded border border-white/10">
                                                         <div className="font-bold text-sm text-white">{d.title}</div>
                                                         <div className="text-xs text-gray-400 mb-2">{d.description}</div>
                                                         <div className="grid grid-cols-1 gap-2">
                                                             {d.options.map(opt => (
-                                                                <button key={opt.id} className="text-xs bg-white/10 hover:bg-white/20 py-1.5 px-2 rounded text-left flex justify-between">
+                                                                <button key={opt.id} onClick={() => handleMakeDecision(d.id, opt.id)} className="text-xs bg-white/10 hover:bg-white/20 py-1.5 px-2 rounded text-left flex justify-between">
                                                                     <span>{opt.label}</span>
                                                                     <span className="text-gray-500">{opt.cost > 0 ? `-$${opt.cost}` : 'Free'}</span>
                                                                 </button>
@@ -383,19 +508,19 @@ function App() {
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
                                                 <div className="text-xs text-gray-400 uppercase mb-1">Global Economy</div>
-                                                <div className="text-2xl font-bold text-white">{market.cycleStage}</div>
+                                                <div className="text-2xl font-bold text-white">{market?.cycleStage}</div>
                                             </div>
-                                            <CycleIcon stage={market.cycleStage} />
+                                            <CycleIcon stage={market?.cycleStage ?? 'Recovery'} />
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4 mt-6">
                                             <div className="bg-white/5 p-3 rounded-lg text-center">
                                                 <div className="text-xs text-gray-500">Interest Rate</div>
-                                                <div className="text-xl font-mono text-blue-300">{(market.interestRate * 100).toFixed(2)}%</div>
+                                                <div className="text-xl font-mono text-blue-300">{((market?.interestRate ?? 0) * 100).toFixed(2)}%</div>
                                             </div>
                                             <div className="bg-white/5 p-3 rounded-lg text-center">
                                                 <div className="text-xs text-gray-500">S&P 500</div>
-                                                <div className="text-xl font-mono text-purple-300">{market.stockMarketIndex.toFixed(0)}</div>
+                                                <div className="text-xl font-mono text-purple-300">{(market?.stockMarketIndex ?? 0).toFixed(0)}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -408,10 +533,33 @@ function App() {
                                             </div>
                                         </div>
                                         <div className="p-4 space-y-1">
-                                            <AssetItem name="Index Funds (S&P 500)" value={portfolio.stocksValue} total={netWorth} color="bg-purple-500" />
-                                            <AssetItem name="Government Bonds" value={portfolio.bondsValue} total={netWorth} color="bg-yellow-500" />
-                                            <AssetItem name="Real Estate" value={portfolio.realEstateValue} total={netWorth} color="bg-emerald-500" />
-                                            <AssetItem name="Cash Reserves" value={cash} total={netWorth} color="bg-blue-500" />
+                                            <AssetItem 
+                                                name="Index Funds (S&P 500)" 
+                                                value={portfolio?.stocksValue ?? 0} 
+                                                total={netWorth} 
+                                                color="bg-purple-500" 
+                                                onSell={(amt: number) => handleSellAsset('STOCK', amt)}
+                                            />
+                                            <AssetItem 
+                                                name="Government Bonds" 
+                                                value={portfolio?.bondsValue ?? 0} 
+                                                total={netWorth} 
+                                                color="bg-yellow-500"
+                                                onSell={(amt: number) => handleSellAsset('BOND', amt)}
+                                            />
+                                            <AssetItem 
+                                                name="Real Estate" 
+                                                value={portfolio?.realEstateValue ?? 0} 
+                                                total={netWorth} 
+                                                color="bg-emerald-500"
+                                                onSell={(amt: number) => handleSellAsset('REAL_ESTATE', amt)}
+                                            />
+                                            <AssetItem 
+                                                name="Cash Reserves" 
+                                                value={cash} 
+                                                total={netWorth} 
+                                                color="bg-blue-500"
+                                            />
                                         </div>
 
                                         <div className="p-4 bg-black/20 border-t border-white/5">
@@ -430,10 +578,10 @@ function App() {
 
                                     <div className="glass-card flex-1 overflow-hidden flex flex-col">
                                         <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                            {events.slice().reverse().map((evt: any, idx: number) => (
+                                            {(events ?? []).slice().reverse().map((evt: any, idx: number) => (
                                                 <EventCard key={idx} evt={evt} />
                                             ))}
-                                            {events.length === 0 && (
+                                            {(events ?? []).length === 0 && (
                                                 <div className="flex flex-col items-center justify-center h-full text-gray-600 space-y-2">
                                                     <AlertCircle size={32} />
                                                     <span>No events recorded yet.</span>
@@ -444,21 +592,45 @@ function App() {
 
                                     <button
                                         onClick={handleNextTurn}
-                                        disabled={processing || (business?.pendingDecisions?.length > 0)}
-                                        className={`mt-6 w-full py-4 text-xl font-bold rounded-xl shadow-lg transform transition-all flex items-center justify-center gap-3 ${(business?.pendingDecisions?.length > 0)
+                                        disabled={processing || ((business?.pendingDecisions?.length ?? 0) > 0)}
+                                        className={`mt-6 w-full py-4 text-xl font-bold rounded-xl shadow-lg transform transition-all flex items-center justify-center gap-3 ${((business?.pendingDecisions?.length ?? 0) > 0)
                                             ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50 shadow-none'
                                             : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white hover:-translate-y-1 shadow-emerald-500/20'
                                             }`}
                                     >
                                         {processing ? (
                                             <>Processing <span className="animate-spin">⟳</span></>
-                                        ) : (business?.pendingDecisions?.length > 0) ? (
+                                        ) : ((business?.pendingDecisions?.length ?? 0) > 0) ? (
                                             <><AlertCircle size={24} /> DECISIONS REQUIRED</>
                                         ) : (
                                             <>PROCESS MONTH <ArrowUpRight strokeWidth={3} /></>
                                         )}
                                     </button>
                                 </div>
+                            </div>
+                        )}
+                            </>
+                        )}
+                        
+                        {activeTab === 'skills' && (
+                            <SkillTree 
+                                skills={gameState.skills} 
+                                onUnlockSkill={handleUnlockSkill}
+                            />
+                        )}
+                        
+                        {activeTab === 'stats' && (
+                            <div className="space-y-6">
+                                <VisualProgression 
+                                    netWorth={gameState.netWorth}
+                                    lifestyle={gameState.lifestyle.tier}
+                                    level={gameState.level}
+                                />
+                                <NetWorthChart 
+                                    netWorthHistory={gameState.netWorthHistory}
+                                    currentNetWorth={gameState.netWorth}
+                                    currentMonth={gameState.month}
+                                />
                             </div>
                         )}
                     </div>
@@ -542,6 +714,22 @@ function App() {
                         </div>
                     </div>
                 </div>
+            )}
+            
+            {/* Challenge Selector Modal */}
+            {showChallengeSelector && (
+                <ChallengeSelector
+                    onSelectChallenge={handleStartChallenge}
+                    onClose={() => setShowChallengeSelector(false)}
+                />
+            )}
+            
+            {/* Scenario Selector Modal */}
+            {showScenarioSelector && (
+                <ScenarioSelector
+                    onSelectScenario={handleStartScenario}
+                    onClose={() => setShowScenarioSelector(false)}
+                />
             )}
         </div>
     )

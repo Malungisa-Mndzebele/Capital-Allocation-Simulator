@@ -99,7 +99,7 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onT
                         <div className="glass-card p-4 flex flex-col items-center">
                             <span className="text-sm text-blue-400">Monthly Net Income</span>
                             <span className="text-2xl font-bold text-green-300">
-                                ${((career.salary / 12) * 0.8 - career.expensesLiving - (career.isStudying ? career.tuitionCost : 0)).toFixed(0)}
+                                ${((career.salary / 12) * (1 - 0.20) - (gameState.lifestyle.rent + gameState.lifestyle.food + gameState.lifestyle.transport + gameState.lifestyle.entertainment) - (career.isStudying ? career.tuitionCost : 0)).toFixed(0)}
                             </span>
                         </div>
                         <div className="glass-card p-4 flex flex-col items-center">
@@ -132,7 +132,7 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onT
                                 </div>
                                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                                     <span>Living Expenses</span>
-                                    <span className="text-red-400">-${career.expensesLiving}</span>
+                                    <span className="text-red-400">-${gameState.lifestyle.rent + gameState.lifestyle.food + gameState.lifestyle.transport + gameState.lifestyle.entertainment}</span>
                                 </div>
                             </div>
                         </div>

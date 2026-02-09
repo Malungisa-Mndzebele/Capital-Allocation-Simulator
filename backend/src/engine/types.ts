@@ -13,6 +13,12 @@ export interface PlayerStats {
     children: number;
     isPregnant: boolean;
     pregnancyMonth: number;
+    // Personality traits (0-100)
+    riskTolerance: number;
+    workEthic: number;
+    socialSkills: number;
+    creativity: number;
+    discipline: number;
 }
 
 export interface Lifestyle {
@@ -30,6 +36,8 @@ export interface GameState {
     month: number;
     cash: number;
     netWorth: number;
+    netWorthHistory: NetWorthDataPoint[];
+    difficulty: 'Easy' | 'Normal' | 'Hard';
     player: PlayerStats;
     lifestyle: Lifestyle;
     career: CareerState; // Level 1 specific
@@ -37,8 +45,43 @@ export interface GameState {
     portfolio: PortfolioState; // Level 3 specific
     market: MarketState;
     events: EventLog[];
+    achievements: Achievement[];
+    loans: Loan[];
+    creditScore: number;
+    skills: PlayerSkills;
+    activeChallenge: string | null;
+    activeScenario: string | null;
     gameOver: boolean;
     gameOverReason?: string;
+}
+
+export interface NetWorthDataPoint {
+    month: number;
+    value: number;
+}
+
+export interface PlayerSkills {
+    unlockedSkills: string[];
+    skillPoints: number;
+}
+
+export interface Loan {
+    id: string;
+    type: 'student' | 'business' | 'mortgage';
+    principal: number;
+    balance: number;
+    interestRate: number;
+    monthlyPayment: number;
+    remainingMonths: number;
+    originationMonth: number;
+}
+
+export interface Achievement {
+    id: string;
+    title: string;
+    description: string;
+    unlocked: boolean;
+    unlockedAt?: number;
 }
 
 export type BusinessType = 'Retail' | 'Tech' | 'Service';
