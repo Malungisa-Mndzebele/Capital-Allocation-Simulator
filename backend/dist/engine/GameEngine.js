@@ -8,6 +8,8 @@ const CareerLogic_1 = require("./systems/CareerLogic");
 const LoanLogic_1 = require("./systems/LoanLogic");
 const PersonalityLogic_1 = require("./systems/PersonalityLogic");
 const SkillTreeLogic_1 = require("./systems/SkillTreeLogic");
+const ChallengeMode_1 = require("./systems/ChallengeMode");
+const ScenarioMode_1 = require("./systems/ScenarioMode");
 const config_1 = require("./config");
 const achievements_1 = require("./achievements");
 class GameEngine {
@@ -25,6 +27,12 @@ class GameEngine {
         // 2. Lifestyle Cost Calculation
         const relationshipCost = config_1.RELATIONSHIP_COSTS[newState.player.relationshipStatus] ?? 0;
         const childCost = newState.player.children * config_1.CHILD_COST_PER_MONTH;
+        // Apply skill bonuses to lifestyle costs
+        const lifestyleCostReduction = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'lifestyle');
+        const relationshipCostReduction = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'relationship_costs');
+        const adjustedLifestyleCosts = (newState.lifestyle.rent + newState.lifestyle.food +
+            newState.lifestyle.transport + newState.lifestyle.entertainment) * (1 + lifestyleCostReduction);
+        const adjustedRelationshipCost = relationshipCost * (1 + relationshipCostReduction);
         // Process loan payments
         const loanResult = LoanLogic_1.LoanLogic.processMonthlyPayments(newState.loans);
         newState.loans = loanResult.updatedLoans;
@@ -41,11 +49,8 @@ class GameEngine {
                 }
             });
         }
-        const totalExpenses = newState.lifestyle.rent +
-            newState.lifestyle.food +
-            newState.lifestyle.transport +
-            newState.lifestyle.entertainment +
-            relationshipCost +
+        const totalExpenses = adjustedLifestyleCosts +
+            adjustedRelationshipCost +
             childCost +
             loanPayment;
         // Pregnancy Progression
@@ -67,11 +72,12 @@ class GameEngine {
         // --- LEVEL 1: CAREER & EDUCATION ---
         if (newState.level === 'Career') {
             const oldCareer = newState.career;
+            const studySpeedBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'study_speed');
             newState.career = CareerLogic_1.CareerLogic.processMonth(newState.career, {
                 intelligence: newState.player.intelligence,
                 wisdom: newState.player.wisdom,
                 strength: newState.player.strength
-            });
+            }, studySpeedBonus);
             // Add relationship/family decisions based on actual status
             if (newState.player.relationshipStatus === 'Single' && Math.random() < 0.1) {
                 newState.career.pendingDecisions.push({
@@ -123,6 +129,9 @@ class GameEngine {
                 recovery = 5;
             if (newState.lifestyle.tier === 'Homeless')
                 recovery = -2; // Draining
+            // Skill bonus (Health Nut)
+            const energyRecoveryBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'energy_recovery');
+            recovery += energyRecoveryBonus;
             newState.player.energy = Math.min(100, Math.max(0, newState.player.energy + recovery));
             // Check for Promotion
             if (newState.career.jobTitle !== oldCareer.jobTitle) {
@@ -145,13 +154,19 @@ class GameEngine {
                 productivityMultiplier *= 1.2;
             else if (newState.difficulty === 'Hard')
                 productivityMultiplier *= 0.8;
-            // Work ethic bonus
-            const workEthicBonus = PersonalityLogic_1.PersonalityLogic.getPersonalityBonus(newState.player, 'promotion_chance');
-            productivityMultiplier *= (1 + workEthicBonus);
-            const effectiveIncome = grossMonthly * productivityMultiplier;
+            // Personality bonus (work ethic + social skills affect promotions/income)
+            const personalityBonus = PersonalityLogic_1.PersonalityLogic.getPersonalityBonus(newState.player, 'promotion_chance');
+            productivityMultiplier *= (1 + personalityBonus);
+            // Skill bonuses (Negotiator, Workaholic, Executive)
+            const salarySkillBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'salary');
+            const salaryWithSkills = newState.career.salary * (1 + salarySkillBonus);
+            const adjustedGrossMonthly = (salaryWithSkills / 12) * productivityMultiplier;
+            const effectiveIncome = adjustedGrossMonthly;
             const tax = effectiveIncome * config_1.TAX_RATE;
             const tuition = newState.career.isStudying ? newState.career.tuitionCost : 0;
-            const monthlyNet = effectiveIncome - tax - tuition - totalExpenses;
+            // Add passive income from skills (Life Coach)
+            const passiveIncome = SkillTreeLogic_1.SkillTreeLogic.getPassiveIncome(newState.skills);
+            const monthlyNet = effectiveIncome - tax - tuition - totalExpenses + passiveIncome;
             newState.cash += monthlyNet;
             if (productivityMultiplier !== 1.0) {
                 newState.events.push({
@@ -228,8 +243,20 @@ class GameEngine {
             });
             // Business Phase
             newState.business = BusinessLogic_1.BusinessLogic.processMonth(newState.business, newState.market);
-            const monthlyProfit = newState.business.revenue - newState.business.expensesTotal;
-            newState.cash += monthlyProfit;
+            // Apply skill bonuses to business
+            const demandSkillBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'demand');
+            const expenseSkillBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'business_expenses');
+            const profitSkillBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'business_profit');
+            // Apply bonuses
+            if (demandSkillBonus !== 0) {
+                newState.business.demand *= (1 + demandSkillBonus);
+            }
+            const adjustedExpenses = newState.business.expensesTotal * (1 + expenseSkillBonus); // expenseSkillBonus is negative for reduction
+            const adjustedRevenue = newState.business.revenue * (1 + profitSkillBonus);
+            const monthlyProfit = adjustedRevenue - adjustedExpenses;
+            // Add passive income from skills
+            const passiveIncome = SkillTreeLogic_1.SkillTreeLogic.getPassiveIncome(newState.skills);
+            newState.cash += monthlyProfit + passiveIncome;
             // Random business events (20% chance per month)
             if (Math.random() < 0.2) {
                 const businessEvents = [
@@ -264,7 +291,20 @@ class GameEngine {
             });
             // ...
             // Investment Phase
+            const oldPortfolio = { ...newState.portfolio };
             newState.portfolio = InvestmentLogic_1.InvestmentLogic.processMonth(newState.portfolio, newState.market, oldMarketIndex, newState.month);
+            // Apply investment skill bonuses
+            const investmentReturnBonus = SkillTreeLogic_1.SkillTreeLogic.getSkillBonus(newState.skills, 'investment_returns');
+            if (investmentReturnBonus !== 0) {
+                // Calculate the gains/losses from this month
+                const stockGain = newState.portfolio.stocksValue - oldPortfolio.stocksValue;
+                const bondGain = newState.portfolio.bondsValue - oldPortfolio.bondsValue;
+                const realEstateGain = newState.portfolio.realEstateValue - oldPortfolio.realEstateValue;
+                // Apply bonus to gains (or reduce losses)
+                newState.portfolio.stocksValue += stockGain * investmentReturnBonus;
+                newState.portfolio.bondsValue += bondGain * investmentReturnBonus;
+                newState.portfolio.realEstateValue += realEstateGain * investmentReturnBonus;
+            }
             const investmentIncome = newState.portfolio.cash;
             newState.cash += investmentIncome;
             newState.portfolio.cash = 0; // Reset accumulation
@@ -290,15 +330,22 @@ class GameEngine {
                 });
             }
         }
-        // Net Worth (Universal) — includes business value estimate
+        // Net Worth (Universal) — includes business value estimate, minus debt
         const businessValue = newState.level !== 'Career'
             ? Math.max(0, (newState.business.revenue - newState.business.expensesTotal) * 12 * 3) // ~3x annual profit
             : 0;
+        const totalDebt = newState.loans.reduce((sum, loan) => sum + loan.balance, 0);
         newState.netWorth = newState.cash +
             newState.portfolio.stocksValue +
             newState.portfolio.bondsValue +
             newState.portfolio.realEstateValue +
-            businessValue;
+            businessValue -
+            totalDebt;
+        // Track net worth history
+        newState.netWorthHistory.push({
+            month: newState.month,
+            value: newState.netWorth
+        });
         // Check for new achievements
         const newAchievements = (0, achievements_1.checkAchievements)(newState, newState.achievements);
         const unlockedThisTurn = newAchievements.filter(a => a.unlocked && a.unlockedAt === newState.month &&
@@ -327,6 +374,40 @@ class GameEngine {
         }
         // Update credit score
         newState.creditScore = LoanLogic_1.LoanLogic.calculateCreditScore(newState);
+        // Check challenge completion
+        if (newState.activeChallenge) {
+            const challenge = ChallengeMode_1.CHALLENGES.find(c => c.id === newState.activeChallenge);
+            if (challenge && ChallengeMode_1.ChallengeMode.checkChallengeCompletion(challenge, newState)) {
+                newState.events.push({
+                    month: newState.month,
+                    description: `🏆 CHALLENGE COMPLETED: ${challenge.name}!`,
+                    impact: `Earned ${challenge.rewards.skillPointBonus} bonus skill points!`
+                });
+                newState.skills.skillPoints += challenge.rewards.skillPointBonus;
+                // Don't clear challenge - let player continue with restrictions if they want
+            }
+        }
+        // Check scenario completion
+        if (newState.activeScenario) {
+            const scenario = ScenarioMode_1.SCENARIOS.find((s) => s.id === newState.activeScenario);
+            if (scenario) {
+                const completion = ScenarioMode_1.ScenarioMode.checkScenarioCompletion(scenario, newState);
+                if (completion.completed) {
+                    newState.events.push({
+                        month: newState.month,
+                        description: `🎉 SCENARIO COMPLETED: ${scenario.name}!`,
+                        impact: scenario.goal.description
+                    });
+                    newState.gameOver = true;
+                    newState.gameOverReason = `Victory! ${scenario.goal.description}`;
+                }
+                else if (completion.reason) {
+                    // Scenario failed
+                    newState.gameOver = true;
+                    newState.gameOverReason = completion.reason;
+                }
+            }
+        }
         return newState;
     }
     static calculateRetirementScore(state) {
@@ -469,6 +550,9 @@ class GameEngine {
                 unlockedSkills: [],
                 skillPoints: 0
             },
+            netWorthHistory: [{ month: 1, value: startingCash }],
+            activeChallenge: null,
+            activeScenario: null,
             gameOver: false,
             gameOverReason: ''
         };

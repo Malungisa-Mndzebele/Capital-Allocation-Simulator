@@ -445,7 +445,7 @@ export class GameEngine {
         
         // Check scenario completion
         if (newState.activeScenario) {
-            const scenario = SCENARIOS.find(s => s.id === newState.activeScenario);
+            const scenario = SCENARIOS.find((s: any) => s.id === newState.activeScenario);
             if (scenario) {
                 const completion = ScenarioMode.checkScenarioCompletion(scenario, newState);
                 if (completion.completed) {

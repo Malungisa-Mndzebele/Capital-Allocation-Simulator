@@ -11,6 +11,8 @@ const config_1 = require("./engine/config");
 const LoanLogic_1 = require("./engine/systems/LoanLogic");
 const PersonalityLogic_1 = require("./engine/systems/PersonalityLogic");
 const SkillTreeLogic_1 = require("./engine/systems/SkillTreeLogic");
+const ChallengeMode_1 = require("./engine/systems/ChallengeMode");
+const ScenarioMode_1 = require("./engine/systems/ScenarioMode");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
 let prisma = null;
@@ -169,6 +171,16 @@ app.post('/api/game/action', async (req, res) => {
         if (!session)
             return res.status(404).json({ error: 'No game' });
         const state = castState(session.gameState);
+        // --- Challenge Mode Validation ---
+        if (state.activeChallenge && action !== 'RESET' && action !== 'START_CHALLENGE' && action !== 'START_SCENARIO') {
+            const challenge = ChallengeMode_1.CHALLENGES.find(c => c.id === state.activeChallenge);
+            if (challenge) {
+                const validation = ChallengeMode_1.ChallengeMode.validateAction(challenge, action, payload, state);
+                if (!validation.valid) {
+                    return res.status(400).json({ error: validation.reason });
+                }
+            }
+        }
         // --- RESET ---
         if (action === 'RESET') {
             const difficulty = payload?.difficulty || 'Normal';
@@ -461,6 +473,45 @@ app.post('/api/game/action', async (req, res) => {
             catch (error) {
                 return res.status(400).json({ error: error instanceof Error ? error.message : 'Cannot unlock skill' });
             }
+        }
+        // --- START_CHALLENGE ---
+        if (action === 'START_CHALLENGE') {
+            const challengeId = payload?.challengeId;
+            if (!isString(challengeId)) {
+                return res.status(400).json({ error: 'challengeId is required' });
+            }
+            const challenge = ChallengeMode_1.CHALLENGES.find(c => c.id === challengeId);
+            if (!challenge) {
+                return res.status(400).json({ error: 'Invalid challenge ID' });
+            }
+            // Reset game with challenge active
+            const difficulty = payload?.difficulty || 'Normal';
+            const newState = GameEngine_1.GameEngine.getInitialState(difficulty);
+            newState.activeChallenge = challengeId;
+            newState.events.push({
+                month: 1,
+                description: `🎯 Challenge Started: ${challenge.name}`,
+                impact: challenge.description
+            });
+            const updated = await prisma.gameSession.update({ where: { userId }, data: { gameState: newState } });
+            return res.json(updated.gameState);
+        }
+        // --- START_SCENARIO ---
+        if (action === 'START_SCENARIO') {
+            const scenarioId = payload?.scenarioId;
+            if (!isString(scenarioId)) {
+                return res.status(400).json({ error: 'scenarioId is required' });
+            }
+            const scenario = ScenarioMode_1.SCENARIOS.find((s) => s.id === scenarioId);
+            if (!scenario) {
+                return res.status(400).json({ error: 'Invalid scenario ID' });
+            }
+            // Create base state and apply scenario
+            const baseState = GameEngine_1.GameEngine.getInitialState('Normal');
+            const newState = ScenarioMode_1.ScenarioMode.applyScenario(scenario, baseState);
+            newState.activeScenario = scenarioId;
+            const updated = await prisma.gameSession.update({ where: { userId }, data: { gameState: newState } });
+            return res.json(updated.gameState);
         }
         // Save back to DB
         const updatedSession = await prisma.gameSession.update({

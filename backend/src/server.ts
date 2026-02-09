@@ -543,7 +543,7 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'scenarioId is required' });
             }
             
-            const scenario = SCENARIOS.find(s => s.id === scenarioId);
+            const scenario = SCENARIOS.find((s: any) => s.id === scenarioId);
             if (!scenario) {
                 return res.status(400).json({ error: 'Invalid scenario ID' });
             }
