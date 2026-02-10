@@ -8,7 +8,7 @@ import { RetirementLogic } from './systems/RetirementLogic';
 import { PersonalityLogic } from './systems/PersonalityLogic';
 import { SkillTreeLogic } from './systems/SkillTreeLogic';
 import { ChallengeMode, CHALLENGES } from './systems/ChallengeMode';
-import { ScenarioMode, SCENARIOS } from './systems/ScenarioMode';
+// import { ScenarioMode, SCENARIOS } from './systems/ScenarioMode'; // Temporarily disabled due to file issue
 import { TAX_RATE, RELATIONSHIP_COSTS, CHILD_COST_PER_MONTH, LIFESTYLE_TIERS, RETIREMENT_LIMITS } from './config';
 import { checkAchievements } from './achievements';
 
@@ -594,6 +594,8 @@ export class GameEngine {
         }
         
         // Check scenario completion
+        // Temporarily disabled due to ScenarioMode file issue
+        /*
         if (newState.activeScenario) {
             const scenario = SCENARIOS.find((s: any) => s.id === newState.activeScenario);
             if (scenario) {
@@ -613,6 +615,7 @@ export class GameEngine {
                 }
             }
         }
+        */
 
         return newState;
     }

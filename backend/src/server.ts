@@ -13,7 +13,7 @@ import { CareerLogic } from './engine/systems/CareerLogic';
 import { PersonalityLogic } from './engine/systems/PersonalityLogic';
 import { SkillTreeLogic, SKILL_TREE } from './engine/systems/SkillTreeLogic';
 import { ChallengeMode, CHALLENGES } from './engine/systems/ChallengeMode';
-import { ScenarioMode, SCENARIOS } from './engine/systems/ScenarioMode';
+// import { ScenarioMode, SCENARIOS } from './engine/systems/ScenarioMode'; // Temporarily disabled
 import { RetirementLogic } from './engine/systems/RetirementLogic';
 
 const app = express();
@@ -540,7 +540,8 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
             return res.json(updated.gameState);
         }
         
-        // --- START_SCENARIO ---
+        // --- START_SCENARIO --- Temporarily disabled
+        /*
         if (action === 'START_SCENARIO') {
             const scenarioId = payload?.scenarioId;
             if (!isString(scenarioId)) {
@@ -560,6 +561,7 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
             const updated = await prisma!.gameSession.update({ where: { userId }, data: { gameState: newState as any } });
             return res.json(updated.gameState);
         }
+        */
 
         // --- OPEN_RETIREMENT_ACCOUNT ---
         if (action === 'OPEN_RETIREMENT_ACCOUNT') {
