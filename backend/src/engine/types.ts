@@ -1,5 +1,7 @@
 export type GameLevel = 'Career' | 'Business' | 'Investor';
 
+export type RetirementAccountType = '401k' | 'traditional_ira' | 'roth_ira' | 'solo_401k';
+
 
 
 export interface PlayerStats {
@@ -43,6 +45,7 @@ export interface GameState {
     career: CareerState; // Level 1 specific
     business: BusinessState; // Level 2 specific
     portfolio: PortfolioState; // Level 3 specific
+    retirement: RetirementState; // Retirement accounts
     market: MarketState;
     events: EventLog[];
     achievements: Achievement[];
@@ -63,6 +66,32 @@ export interface NetWorthDataPoint {
 export interface PlayerSkills {
     unlockedSkills: string[];
     skillPoints: number;
+}
+
+export interface VestingSchedule {
+    totalYears: number;
+    vestedPercentage: number; // 0-100
+}
+
+export interface RetirementAccount {
+    id: string;
+    type: RetirementAccountType;
+    balance: number;
+    contributionRate: number; // percentage of gross income (0-100)
+    employerMatch: number; // employer match percentage (e.g., 50 means 50% match)
+    employerMatchLimit: number; // max percentage of salary that gets matched (e.g., 6)
+    vestingSchedule: VestingSchedule;
+    annualContributions: number; // tracks contributions in current calendar year
+    accountAge: number; // in months
+    unvestedBalance: number; // employer contributions not yet vested
+    isActive: boolean; // false if player changed jobs
+}
+
+export interface RetirementState {
+    accounts: RetirementAccount[];
+    currentYearContributions401k: number;
+    currentYearContributionsIRA: number;
+    lastResetYear: number; // track when we last reset annual contributions
 }
 
 export interface Loan {
@@ -110,6 +139,10 @@ export interface CareerState {
     expensesLiving: number; // Deprecated, see Lifestyle
     savingsGoal: number; // E.g., 10000 to unlock Business
     pendingDecisions: GameDecision[];
+    has401k: boolean; // Whether current job offers 401(k)
+    matchPercentage: number; // Employer match percentage (e.g., 50 means 50% match)
+    matchLimit: number; // Max percentage of salary that gets matched (e.g., 6)
+    vestingYears: number; // Years until full vesting (0 for immediate)
 }
 
 export interface BusinessState {
@@ -122,6 +155,7 @@ export interface BusinessState {
     capacity: number;
     inventory: number;
     pendingDecisions: GameDecision[];
+    hasSolo401k: boolean; // Whether business owner has set up Solo 401(k)
 }
 
 export interface PortfolioState {

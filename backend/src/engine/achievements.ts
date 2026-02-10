@@ -105,6 +105,51 @@ export const ACHIEVEMENTS: AchievementCheck[] = [
         title: 'Living Large',
         description: 'Maintain luxury lifestyle for 12 months',
         check: (state) => state.lifestyle.tier === 'Luxury'
+    },
+    {
+        id: 'first_retirement_account',
+        title: 'Planning Ahead',
+        description: 'Open your first retirement account',
+        check: (state) => state.retirement.accounts.length > 0
+    },
+    {
+        id: 'max_employer_match',
+        title: 'Free Money',
+        description: 'Maximize employer 401(k) match for 12 consecutive months',
+        check: (state) => {
+            const active401k = state.retirement.accounts.find((acc: any) => acc.type === '401k' && acc.isActive);
+            if (!active401k || active401k.employerMatch === 0) return false;
+            // Check if contribution rate meets or exceeds employer match limit
+            return active401k.contributionRate >= active401k.employerMatchLimit;
+        }
+    },
+    {
+        id: 'contribution_limit',
+        title: 'Maxed Out',
+        description: 'Reach annual contribution limit for a retirement account',
+        check: (state) => {
+            // Check if any account has reached its contribution limit
+            const has401k = state.retirement.accounts.some((acc: any) => 
+                acc.type === '401k' && acc.annualContributions >= 23000
+            );
+            const hasIRA = state.retirement.accounts.some((acc: any) => 
+                (acc.type === 'traditional_ira' || acc.type === 'roth_ira') && 
+                acc.annualContributions >= 7000
+            );
+            return has401k || hasIRA;
+        }
+    },
+    {
+        id: 'retirement_millionaire',
+        title: 'Retirement Millionaire',
+        description: 'Accumulate $1,000,000 in retirement accounts',
+        check: (state) => {
+            const totalRetirementBalance = state.retirement.accounts.reduce(
+                (sum: number, account: any) => sum + account.balance, 
+                0
+            );
+            return totalRetirementBalance >= 1000000;
+        }
     }
 ];
 

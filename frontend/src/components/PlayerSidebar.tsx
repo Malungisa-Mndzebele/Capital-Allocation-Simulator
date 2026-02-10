@@ -1,10 +1,11 @@
 import React from 'react';
-import type { PlayerStats, Lifestyle } from '../types';
-import { User, Zap, Brain, BookOpen, Dumbbell, Home, RotateCcw } from 'lucide-react';
+import type { PlayerStats, Lifestyle, RetirementState } from '../types';
+import { User, Zap, Brain, BookOpen, Dumbbell, Home, RotateCcw, Shield } from 'lucide-react';
 
 interface PlayerSidebarProps {
     player: PlayerStats;
     lifestyle: Lifestyle;
+    retirement?: RetirementState;
     onRestart?: () => void;
 }
 
@@ -23,7 +24,18 @@ const StatBar = ({ icon, label, value, color }: any) => (
     </div>
 );
 
-export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle, onRestart }) => {
+export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle, retirement, onRestart }) => {
+    const totalRetirementBalance = retirement?.accounts.reduce((sum, acc) => sum + acc.balance, 0) || 0;
+    const hasRetirementAccounts = (retirement?.accounts.length || 0) > 0;
+
+    const formatCurrency = (val: number) => {
+        return new Intl.NumberFormat('en-US', { 
+            style: 'currency', 
+            currency: 'USD', 
+            maximumFractionDigits: 0 
+        }).format(val);
+    };
+
     return (
         <div className="w-full lg:w-72 bg-[#0F1016] border-r border-white/5 p-6 flex flex-col h-full overflow-y-auto">
             <div className="flex flex-col items-center mb-8">
@@ -105,6 +117,25 @@ export const PlayerSidebar: React.FC<PlayerSidebarProps> = ({ player, lifestyle,
                     </div>
                 </div>
             </div>
+
+            {/* Retirement Summary */}
+            {hasRetirementAccounts && (
+                <div className="mt-8">
+                    <h3 className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4 border-b border-white/5 pb-2">Retirement</h3>
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Shield size={16} className="text-emerald-400" />
+                            <span className="text-xs text-emerald-400 font-bold uppercase">Tax-Advantaged</span>
+                        </div>
+                        <div className="text-2xl font-mono font-bold text-emerald-400 mb-1">
+                            {formatCurrency(totalRetirementBalance)}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                            {retirement!.accounts.length} account{retirement!.accounts.length !== 1 ? 's' : ''}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="mt-8">
                 <h3 className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-4 border-b border-white/5 pb-2">Family</h3>

@@ -14,7 +14,8 @@ import {
     AlertCircle,
     Calendar,
     Skull,
-    Home
+    Home,
+    Shield
 } from 'lucide-react'
 import { CareerDashboard } from './components/CareerDashboard'
 import { PlayerSidebar } from './components/PlayerSidebar'
@@ -25,6 +26,10 @@ import { ChallengeSelector } from './components/ChallengeSelector'
 import { ScenarioSelector } from './components/ScenarioSelector'
 import { ChallengeProgress } from './components/ChallengeProgress'
 import { ScenarioProgress } from './components/ScenarioProgress'
+import { RetirementDashboard } from './components/RetirementDashboard'
+import { RetirementActions } from './components/RetirementActions'
+import { RetirementTutorial } from './components/RetirementTutorial'
+import { RetirementNotifications } from './components/RetirementNotifications'
 
 // --- HELPER COMPONENTS ---
 
@@ -123,7 +128,9 @@ function App() {
     const [showLifestyleSelector, setShowLifestyleSelector] = useState<boolean>(false)
     const [showChallengeSelector, setShowChallengeSelector] = useState<boolean>(false)
     const [showScenarioSelector, setShowScenarioSelector] = useState<boolean>(false)
-    const [activeTab, setActiveTab] = useState<'game' | 'skills' | 'stats'>('game')
+    const [showRetirementTutorial, setShowRetirementTutorial] = useState<boolean>(false)
+    const [hasSeenRetirementTutorial, setHasSeenRetirementTutorial] = useState<boolean>(false)
+    const [activeTab, setActiveTab] = useState<'game' | 'skills' | 'stats' | 'retirement'>('game')
     const userId = "user_123"
 
     // Initialization
@@ -142,6 +149,14 @@ function App() {
             setShowLifestyleSelector(true);
         }
     }, [gameState]);
+
+    // Show retirement tutorial when player first becomes eligible for 401(k)
+    useEffect(() => {
+        if (gameState && !hasSeenRetirementTutorial && gameState.career.has401k && gameState.retirement.accounts.length === 0) {
+            setShowRetirementTutorial(true);
+            setHasSeenRetirementTutorial(true);
+        }
+    }, [gameState, hasSeenRetirementTutorial]);
 
     // Derived State helper
     const profit = gameState?.business ? (gameState.business.revenue - gameState.business.expensesTotal) : 0;
@@ -300,6 +315,39 @@ function App() {
         }
     };
 
+    const handleOpenRetirementAccount = async (accountType: string) => {
+        if (!gameState) return;
+        try {
+            const newState = await performAction(userId, 'OPEN_RETIREMENT_ACCOUNT', { accountType });
+            setGameState(newState);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to open retirement account: ' + (e as any).response?.data?.error || 'Unknown error');
+        }
+    };
+
+    const handleSetContributionRate = async (accountId: string, rate: number) => {
+        if (!gameState) return;
+        try {
+            const newState = await performAction(userId, 'SET_CONTRIBUTION_RATE', { accountId, rate });
+            setGameState(newState);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to set contribution rate: ' + (e as any).response?.data?.error || 'Unknown error');
+        }
+    };
+
+    const handleWithdrawRetirement = async (accountId: string, amount: number) => {
+        if (!gameState) return;
+        try {
+            const newState = await performAction(userId, 'WITHDRAW_RETIREMENT', { accountId, amount });
+            setGameState(newState);
+        } catch (e) {
+            console.error(e);
+            alert('Failed to withdraw from retirement account: ' + (e as any).response?.data?.error || 'Unknown error');
+        }
+    };
+
     if (loading) return <div className="min-h-screen bg-black text-blue-500 flex items-center justify-center font-mono animate-pulse">INITIALIZING SYSTEM...</div>
     if (!gameState) return <div className="min-h-screen bg-black text-red-500 flex items-center justify-center font-mono">CONNECTION FAILURE</div>
 
@@ -324,7 +372,12 @@ function App() {
     return (
         <div className="flex h-screen bg-[#0a0b14] text-gray-100 font-sans selection:bg-blue-500/30 overflow-hidden">
             {/* Sidebar (Always Visible) */}
-            <PlayerSidebar player={gameState.player} lifestyle={gameState.lifestyle} onRestart={handleRestart} />
+            <PlayerSidebar 
+                player={gameState.player} 
+                lifestyle={gameState.lifestyle} 
+                retirement={gameState.retirement}
+                onRestart={handleRestart} 
+            />
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
 
@@ -374,6 +427,22 @@ function App() {
                             }`}
                         >
                             Game
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('retirement')}
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                                activeTab === 'retirement'
+                                    ? 'text-emerald-400 border-b-2 border-emerald-400'
+                                    : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                        >
+                            <Shield size={14} />
+                            Retirement
+                            {gameState.retirement?.accounts.length > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 bg-emerald-500/30 text-emerald-400 rounded text-xs">
+                                    {gameState.retirement.accounts.length}
+                                </span>
+                            )}
                         </button>
                         <button
                             onClick={() => setActiveTab('skills')}
@@ -612,6 +681,32 @@ function App() {
                             </>
                         )}
                         
+                        {activeTab === 'retirement' && (
+                            <div className="space-y-6">
+                                <RetirementNotifications
+                                    retirement={gameState.retirement}
+                                    career={gameState.career}
+                                    playerAge={gameState.player.age}
+                                    grossIncome={gameState.career.salary}
+                                />
+                                <RetirementActions
+                                    retirement={gameState.retirement}
+                                    career={gameState.career}
+                                    business={gameState.business}
+                                    playerAge={gameState.player.age}
+                                    cash={gameState.cash}
+                                    onOpenAccount={handleOpenRetirementAccount}
+                                    onSetContributionRate={handleSetContributionRate}
+                                    onWithdraw={handleWithdrawRetirement}
+                                />
+                                <RetirementDashboard
+                                    retirement={gameState.retirement}
+                                    playerAge={gameState.player.age}
+                                    grossIncome={gameState.career.salary}
+                                />
+                            </div>
+                        )}
+                        
                         {activeTab === 'skills' && (
                             <SkillTree 
                                 skills={gameState.skills} 
@@ -729,6 +824,17 @@ function App() {
                 <ScenarioSelector
                     onSelectScenario={handleStartScenario}
                     onClose={() => setShowScenarioSelector(false)}
+                />
+            )}
+            
+            {/* Retirement Tutorial Modal */}
+            {showRetirementTutorial && gameState && (
+                <RetirementTutorial
+                    onClose={() => setShowRetirementTutorial(false)}
+                    employerMatch={gameState.career.matchPercentage}
+                    employerMatchLimit={gameState.career.matchLimit}
+                    contributionLimit={23000}
+                    playerAge={gameState.player.age}
                 />
             )}
         </div>

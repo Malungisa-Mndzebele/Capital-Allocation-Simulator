@@ -1,6 +1,6 @@
 import React from 'react';
 import type { GameState } from '../types';
-import { Briefcase, GraduationCap, DollarSign, ArrowRight, AlertCircle } from 'lucide-react';
+import { Briefcase, GraduationCap, DollarSign, ArrowRight, AlertCircle, Shield } from 'lucide-react';
 
 interface CareerDashboardProps {
     gameState: GameState;
@@ -11,10 +11,28 @@ interface CareerDashboardProps {
 }
 
 export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onToggleStudy, onSelectJob, onNextMonth, onMakeDecision }) => {
-    const { career, cash, month } = gameState;
+    const { career, cash, month, retirement } = gameState;
     const progressPercent = (career.studyProgress / 12) * 100; // Simplified 12-month per degree step for UI
     const savingsPercent = Math.min((cash / career.savingsGoal) * 100, 100);
     const hasJob = career.jobTitle !== '';
+
+    // Calculate retirement contributions
+    const activeRetirementAccounts = retirement?.accounts.filter(acc => acc.isActive) || [];
+    const total401kContribution = activeRetirementAccounts
+        .filter(acc => acc.type === '401k' || acc.type === 'solo_401k')
+        .reduce((sum, acc) => sum + ((career.salary / 12) * (acc.contributionRate / 100)), 0);
+    const totalIRAContribution = activeRetirementAccounts
+        .filter(acc => acc.type === 'traditional_ira' || acc.type === 'roth_ira')
+        .reduce((sum, acc) => sum + ((career.salary / 12) * (acc.contributionRate / 100)), 0);
+    const totalEmployerMatch = activeRetirementAccounts
+        .filter(acc => acc.employerMatch > 0)
+        .reduce((sum, acc) => {
+            const employeeContribution = (career.salary / 12) * (acc.contributionRate / 100);
+            return sum + Math.min(
+                employeeContribution * (acc.employerMatch / 100),
+                (career.salary / 12) * (acc.employerMatchLimit / 100)
+            );
+        }, 0);
 
     return (
         <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto w-full text-blue-100">
@@ -130,6 +148,33 @@ export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onT
                                     <span>Monthly Gross Pay</span>
                                     <span>${(career.salary / 12).toFixed(0)}</span>
                                 </div>
+                                {total401kContribution > 0 && (
+                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                        <span className="flex items-center gap-1">
+                                            <Shield size={14} className="text-blue-400" />
+                                            401(k) Contribution (Pre-tax)
+                                        </span>
+                                        <span className="text-blue-400">-${total401kContribution.toFixed(0)}</span>
+                                    </div>
+                                )}
+                                {totalEmployerMatch > 0 && (
+                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                        <span className="flex items-center gap-1">
+                                            <Shield size={14} className="text-emerald-400" />
+                                            Employer Match
+                                        </span>
+                                        <span className="text-emerald-400">+${totalEmployerMatch.toFixed(0)}</span>
+                                    </div>
+                                )}
+                                {totalIRAContribution > 0 && (
+                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                        <span className="flex items-center gap-1">
+                                            <Shield size={14} className="text-purple-400" />
+                                            IRA Contribution (After-tax)
+                                        </span>
+                                        <span className="text-purple-400">-${totalIRAContribution.toFixed(0)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                                     <span>Living Expenses</span>
                                     <span className="text-red-400">-${gameState.lifestyle.rent + gameState.lifestyle.food + gameState.lifestyle.transport + gameState.lifestyle.entertainment}</span>

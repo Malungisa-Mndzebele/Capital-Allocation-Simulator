@@ -1,13 +1,69 @@
 import { CareerState } from '../types';
-import { TAX_RATE } from '../config';
+import { TAX_RATE, JOB_401K_BENEFITS } from '../config';
 
 export class CareerLogic {
+    /**
+     * Apply 401(k) benefits based on job title
+     * Requirements: 10.1, 10.2, 10.3
+     */
+    static apply401kBenefits(state: CareerState): CareerState {
+        const benefits = JOB_401K_BENEFITS[state.jobTitle];
+        
+        if (benefits) {
+            return {
+                ...state,
+                has401k: benefits.has401k,
+                matchPercentage: benefits.matchPercentage,
+                matchLimit: benefits.matchLimit,
+                vestingYears: benefits.vestingYears
+            };
+        }
+        
+        // Default: no 401(k) benefits
+        return {
+            ...state,
+            has401k: false,
+            matchPercentage: 0,
+            matchLimit: 0,
+            vestingYears: 0
+        };
+    }
+
+    /**
+     * Handle job change - mark old 401(k) as inactive and forfeit unvested contributions
+     * Requirements: 1.5, 3.4
+     * 
+     * This should be called from GameEngine when a job change occurs
+     */
+    static handleJobChange(
+        oldJobTitle: string,
+        newJobTitle: string,
+        retirementAccounts: any[]
+    ): any[] {
+        // If changing jobs, mark the old 401(k) as inactive
+        if (oldJobTitle !== newJobTitle && oldJobTitle !== '') {
+            return retirementAccounts.map(account => {
+                // Only affect active 401(k) accounts
+                if (account.type === '401k' && account.isActive) {
+                    // Import RetirementLogic to forfeit unvested contributions
+                    // This will be done in GameEngine to avoid circular dependencies
+                    return {
+                        ...account,
+                        isActive: false
+                    };
+                }
+                return account;
+            });
+        }
+        return retirementAccounts;
+    }
+
     static processMonth(
         state: CareerState, 
         playerStats?: { intelligence: number; wisdom: number; strength: number },
         skillBonus?: number
     ): CareerState {
-        const newState = { ...state };
+        let newState = { ...state };
 
         // 1. Study Progress (Intelligence affects study speed)
         if (newState.isStudying) {
@@ -21,16 +77,22 @@ export class CareerLogic {
                 newState.jobTitle = 'Shift Manager';
                 newState.salary = 35000;
                 newState.studyProgress = 0;
+                // Apply 401(k) benefits for new job
+                newState = this.apply401kBenefits(newState);
             } else if (newState.educationLevel === 'Associate' && newState.studyProgress >= 24) {
                 newState.educationLevel = 'Bachelor';
                 newState.jobTitle = 'Regional Manager';
                 newState.salary = 55000;
                 newState.studyProgress = 0;
+                // Apply 401(k) benefits for new job
+                newState = this.apply401kBenefits(newState);
             } else if (newState.educationLevel === 'Bachelor' && newState.studyProgress >= 36) { // Master's
                 newState.educationLevel = 'Master';
                 newState.jobTitle = 'Director of Operations';
                 newState.salary = 95000;
                 newState.isStudying = false; // Cap
+                // Apply 401(k) benefits for new job
+                newState = this.apply401kBenefits(newState);
             }
         }
         
@@ -44,9 +106,13 @@ export class CareerLogic {
                 if (newState.educationLevel === 'High School' && newState.jobTitle !== 'Shift Manager') {
                     newState.jobTitle = 'Shift Manager';
                     newState.salary = 32000; // Slightly less than with degree
+                    // Apply 401(k) benefits for new job
+                    newState = this.apply401kBenefits(newState);
                 } else if (newState.educationLevel === 'Associate' && newState.jobTitle !== 'Regional Manager') {
                     newState.jobTitle = 'Regional Manager';
                     newState.salary = 50000;
+                    // Apply 401(k) benefits for new job
+                    newState = this.apply401kBenefits(newState);
                 }
             }
         }

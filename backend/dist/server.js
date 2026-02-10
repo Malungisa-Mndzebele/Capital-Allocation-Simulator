@@ -9,10 +9,12 @@ const client_1 = require("@prisma/client");
 const GameEngine_1 = require("./engine/GameEngine");
 const config_1 = require("./engine/config");
 const LoanLogic_1 = require("./engine/systems/LoanLogic");
+const CareerLogic_1 = require("./engine/systems/CareerLogic");
 const PersonalityLogic_1 = require("./engine/systems/PersonalityLogic");
 const SkillTreeLogic_1 = require("./engine/systems/SkillTreeLogic");
 const ChallengeMode_1 = require("./engine/systems/ChallengeMode");
 const ScenarioMode_1 = require("./engine/systems/ScenarioMode");
+const RetirementLogic_1 = require("./engine/systems/RetirementLogic");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
 let prisma = null;
@@ -290,6 +292,8 @@ app.post('/api/game/action', async (req, res) => {
             }
             state.career.jobTitle = jobTitle;
             state.career.salary = config_1.SALARIES[jobTitle];
+            // Apply 401(k) benefits for the selected job
+            state.career = CareerLogic_1.CareerLogic.apply401kBenefits(state.career);
             state.events.push({ month: state.month, description: 'CAREER STARTED', impact: `Hired as ${jobTitle} (${state.career.salary}/yr)` });
         }
         // --- START_BUSINESS ---
@@ -512,6 +516,131 @@ app.post('/api/game/action', async (req, res) => {
             newState.activeScenario = scenarioId;
             const updated = await prisma.gameSession.update({ where: { userId }, data: { gameState: newState } });
             return res.json(updated.gameState);
+        }
+        // --- OPEN_RETIREMENT_ACCOUNT ---
+        if (action === 'OPEN_RETIREMENT_ACCOUNT') {
+            const accountType = payload?.accountType;
+            const contributionRate = payload?.contributionRate || 0;
+            if (!isString(accountType)) {
+                return res.status(400).json({ error: 'accountType is required' });
+            }
+            const validAccountTypes = ['401k', 'traditional_ira', 'roth_ira', 'solo_401k'];
+            if (!validAccountTypes.includes(accountType)) {
+                return res.status(400).json({ error: `Invalid account type. Must be one of: ${validAccountTypes.join(', ')}` });
+            }
+            if (typeof contributionRate !== 'number' || contributionRate < 0 || contributionRate > 100) {
+                return res.status(400).json({ error: 'contributionRate must be between 0 and 100' });
+            }
+            // Check eligibility
+            const eligibility = RetirementLogic_1.RetirementLogic.checkAccountEligibility(state.level, state.career.has401k);
+            if (accountType === '401k' && !eligibility.canOpen401k) {
+                return res.status(400).json({ error: 'Current employer does not offer 401(k) benefits' });
+            }
+            if (accountType === 'solo_401k' && !eligibility.canOpenSolo401k) {
+                return res.status(400).json({ error: 'Solo 401(k) is only available for business owners' });
+            }
+            // Check if account type already exists
+            const existingAccount = state.retirement.accounts.find(acc => acc.type === accountType && acc.isActive);
+            if (existingAccount) {
+                return res.status(400).json({ error: `You already have an active ${accountType} account` });
+            }
+            // Create new retirement account
+            const newAccount = {
+                id: `${accountType}_${Date.now()}`,
+                type: accountType,
+                balance: 0,
+                contributionRate,
+                employerMatch: accountType === '401k' ? state.career.matchPercentage : 0,
+                employerMatchLimit: accountType === '401k' ? state.career.matchLimit : 0,
+                vestingSchedule: accountType === '401k'
+                    ? { totalYears: state.career.vestingYears, vestedPercentage: 0 }
+                    : { totalYears: 0, vestedPercentage: 100 },
+                annualContributions: 0,
+                accountAge: 0,
+                unvestedBalance: 0,
+                isActive: true
+            };
+            state.retirement.accounts.push(newAccount);
+            state.events.push({
+                month: state.month,
+                description: `Retirement Account Opened`,
+                impact: `Opened ${accountType.toUpperCase()} with ${contributionRate}% contribution rate`
+            });
+        }
+        // --- SET_CONTRIBUTION_RATE ---
+        if (action === 'SET_CONTRIBUTION_RATE') {
+            const accountId = payload?.accountId;
+            const contributionRate = payload?.contributionRate;
+            if (!isString(accountId)) {
+                return res.status(400).json({ error: 'accountId is required' });
+            }
+            if (typeof contributionRate !== 'number' || contributionRate < 0 || contributionRate > 100) {
+                return res.status(400).json({ error: 'contributionRate must be between 0 and 100' });
+            }
+            const accountIndex = state.retirement.accounts.findIndex(acc => acc.id === accountId);
+            if (accountIndex === -1) {
+                return res.status(400).json({ error: 'Retirement account not found' });
+            }
+            const oldRate = state.retirement.accounts[accountIndex].contributionRate;
+            state.retirement.accounts[accountIndex].contributionRate = contributionRate;
+            state.events.push({
+                month: state.month,
+                description: 'Contribution Rate Updated',
+                impact: `Changed ${state.retirement.accounts[accountIndex].type.toUpperCase()} contribution from ${oldRate}% to ${contributionRate}%`
+            });
+        }
+        // --- WITHDRAW_RETIREMENT ---
+        if (action === 'WITHDRAW_RETIREMENT') {
+            const accountId = payload?.accountId;
+            const amount = payload?.amount;
+            if (!isString(accountId)) {
+                return res.status(400).json({ error: 'accountId is required' });
+            }
+            if (!isPositiveNumber(amount)) {
+                return res.status(400).json({ error: 'amount must be a positive number' });
+            }
+            const accountIndex = state.retirement.accounts.findIndex(acc => acc.id === accountId);
+            if (accountIndex === -1) {
+                return res.status(400).json({ error: 'Retirement account not found' });
+            }
+            const account = state.retirement.accounts[accountIndex];
+            if (amount > account.balance) {
+                return res.status(400).json({ error: 'Insufficient balance in retirement account' });
+            }
+            // Calculate player age from month (assuming month 1 = age 18)
+            const playerAge = 18 + (state.month / 12);
+            // Process withdrawal with penalties and taxes
+            const withdrawalResult = RetirementLogic_1.RetirementLogic.processWithdrawal(account, amount, playerAge, 0.20 // Using standard tax rate from config
+            );
+            if (!withdrawalResult.success) {
+                return res.status(400).json({ error: withdrawalResult.message || 'Withdrawal failed' });
+            }
+            // Update account
+            state.retirement.accounts[accountIndex] = withdrawalResult.account;
+            // Add cash to player
+            state.cash += withdrawalResult.cashReceived;
+            // Create detailed event message
+            let impactMessage = `Withdrew ${amount.toFixed(0)} from ${account.type.toUpperCase()}. `;
+            if (withdrawalResult.penalty > 0) {
+                impactMessage += `Penalty: ${withdrawalResult.penalty.toFixed(0)}. `;
+            }
+            if (withdrawalResult.taxes > 0) {
+                impactMessage += `Taxes: ${withdrawalResult.taxes.toFixed(0)}. `;
+            }
+            impactMessage += `Net received: ${withdrawalResult.cashReceived.toFixed(0)}`;
+            state.events.push({
+                month: state.month,
+                description: 'Retirement Withdrawal',
+                impact: impactMessage
+            });
+            // Warn about early withdrawal if penalty was applied
+            if (withdrawalResult.penalty > 0 && playerAge < 59.5) {
+                state.events.push({
+                    month: state.month,
+                    description: '⚠️ Early Withdrawal Penalty',
+                    impact: 'Withdrawing before age 59.5 incurs a 10% penalty plus taxes'
+                });
+            }
         }
         // Save back to DB
         const updatedSession = await prisma.gameSession.update({

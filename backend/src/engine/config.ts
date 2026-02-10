@@ -37,6 +37,7 @@ export const VALID_ACTIONS = [
     'RESET', 'UPDATE_LIFESTYLE', 'MAKE_DECISION', 'TOGGLE_STUDY',
     'SELECT_JOB', 'START_BUSINESS', 'BUY_ASSET', 'SELL_ASSET', 'UPDATE_BUSINESS',
     'TAKE_LOAN', 'PAY_LOAN', 'UNLOCK_SKILL', 'START_CHALLENGE', 'START_SCENARIO',
+    'OPEN_RETIREMENT_ACCOUNT', 'SET_CONTRIBUTION_RATE', 'WITHDRAW_RETIREMENT',
 ] as const;
 
 export const VALID_ASSET_TYPES = ['STOCK', 'BOND', 'REAL_ESTATE'] as const;
@@ -50,4 +51,42 @@ export const MAX_LOAN_AMOUNTS: Record<string, number> = {
     student: 50000,
     business: 100000,
     mortgage: 500000,
+};
+
+// Retirement account constants (2024 IRS limits)
+export const RETIREMENT_LIMITS = {
+    CONTRIBUTION_401K: 23000,
+    CONTRIBUTION_IRA: 7000,
+    CATCHUP_401K: 7500, // Additional for age 50+
+    CATCHUP_IRA: 1000, // Additional for age 50+
+    SOLO_401K_EMPLOYER: 46000, // Total limit for Solo 401(k) (employee + employer contributions)
+    EARLY_WITHDRAWAL_PENALTY: 0.10, // 10% penalty
+    RMD_AGE: 72, // Required Minimum Distribution age
+    PENALTY_FREE_AGE: 59.5, // Age when withdrawals are penalty-free
+    RMD_PENALTY: 0.50, // 50% penalty for missing RMD
+};
+
+// Vesting schedules (in years)
+export const VESTING_SCHEDULES = {
+    IMMEDIATE: { totalYears: 0, vestedPercentage: 100 },
+    THREE_YEAR: { totalYears: 3, vestedPercentage: 0 },
+    FIVE_YEAR: { totalYears: 5, vestedPercentage: 0 },
+};
+
+// Common employer match formulas
+export const EMPLOYER_MATCH_FORMULAS = {
+    NONE: { matchPercentage: 0, matchLimit: 0 },
+    STANDARD: { matchPercentage: 50, matchLimit: 6 }, // 50% match up to 6% of salary
+    GENEROUS: { matchPercentage: 100, matchLimit: 6 }, // 100% match up to 6% of salary
+    BASIC: { matchPercentage: 50, matchLimit: 3 }, // 50% match up to 3% of salary
+};
+
+// 401(k) benefits by job type
+export const JOB_401K_BENEFITS: Record<string, { has401k: boolean; matchPercentage: number; matchLimit: number; vestingYears: number }> = {
+    'Fast Food': { has401k: false, matchPercentage: 0, matchLimit: 0, vestingYears: 0 },
+    'Warehouse': { has401k: false, matchPercentage: 0, matchLimit: 0, vestingYears: 0 },
+    'Sales': { has401k: false, matchPercentage: 0, matchLimit: 0, vestingYears: 0 },
+    'Shift Manager': { has401k: true, matchPercentage: 50, matchLimit: 3, vestingYears: 3 }, // Basic match
+    'Regional Manager': { has401k: true, matchPercentage: 50, matchLimit: 6, vestingYears: 3 }, // Standard match
+    'Director of Operations': { has401k: true, matchPercentage: 100, matchLimit: 6, vestingYears: 3 }, // Generous match
 };

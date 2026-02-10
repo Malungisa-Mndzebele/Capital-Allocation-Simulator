@@ -1,7 +1,7 @@
 import { PortfolioState, MarketState } from '../types';
 
 export class InvestmentLogic {
-    static processMonth(portfolio: PortfolioState, market: MarketState, oldMarketIndex: number, month: number): PortfolioState {
+    static processMonth(portfolio: PortfolioState, market: MarketState, oldMarketIndex: number): PortfolioState {
         const newPortfolio = { ...portfolio };
 
         // 1. Calculate Stock Performance

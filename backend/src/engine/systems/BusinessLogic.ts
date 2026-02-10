@@ -29,9 +29,8 @@ export class BusinessLogic {
             // Auto-restock if inventory drops below 500 (costs money)
             if (newState.inventory < 500) {
                 const restockAmount = 2000;
-                const restockCost = restockAmount * 2; // $2 per unit wholesale
                 newState.inventory += restockAmount;
-                // This cost will be added to expenses below
+                // Restock cost will be added to materialCost below
             }
         }
 
