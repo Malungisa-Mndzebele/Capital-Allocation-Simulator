@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InvestmentLogic = void 0;
 class InvestmentLogic {
-    static processMonth(portfolio, market, oldMarketIndex, month) {
+    static processMonth(portfolio, market, oldMarketIndex) {
         const newPortfolio = { ...portfolio };
         // 1. Calculate Stock Performance
         // Stocks track the market index exactly (Index Fund)

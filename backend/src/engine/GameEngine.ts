@@ -476,7 +476,7 @@ export class GameEngine {
             // ...
             // Investment Phase
             const oldPortfolio = { ...newState.portfolio };
-            newState.portfolio = InvestmentLogic.processMonth(newState.portfolio, newState.market, oldMarketIndex, newState.month);
+            newState.portfolio = InvestmentLogic.processMonth(newState.portfolio, newState.market, oldMarketIndex);
             
             // Apply investment skill bonuses
             const investmentReturnBonus = SkillTreeLogic.getSkillBonus(newState.skills, 'investment_returns');
