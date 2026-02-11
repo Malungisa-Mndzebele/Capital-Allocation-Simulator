@@ -4,7 +4,7 @@ services:
     env: node
     region: ohio
     buildCommand: cd backend && npm install && npx prisma generate && npm run build
-    startCommand: cd backend && npx prisma migrate deploy && npm start
+    startCommand: cd backend && npm start
     branch: main
     envVars:
       - key: DATABASE_URL
