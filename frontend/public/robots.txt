@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://khasinogaming.com/world/sitemap.xml

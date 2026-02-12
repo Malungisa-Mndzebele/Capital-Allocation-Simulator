@@ -76,7 +76,7 @@ const AssetItem = ({ name, value, total, color, onSell }: any) => {
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-mono text-gray-400 group-hover:text-white transition-colors">{formatCurrency(value)}</span>
                     {canSell && (
-                        <button 
+                        <button
                             onClick={() => onSell(Math.min(5000, value))}
                             className="text-xs px-2 py-0.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                         >
@@ -157,6 +157,26 @@ function App() {
             setHasSeenRetirementTutorial(true);
         }
     }, [gameState, hasSeenRetirementTutorial]);
+
+    // Dynamic Title Update for SEO and UX
+    useEffect(() => {
+        if (!gameState) {
+            document.title = 'Capital Allocation Simulator';
+            return;
+        }
+
+        const mode = gameState.level || 'Simulation';
+        // Format: "Career Mode | $1.2M - Capital Allocation Simulator"
+        const formattedNetWorth = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0,
+            notation: "compact",
+            compactDisplay: "short"
+        }).format(gameState.netWorth);
+
+        document.title = `${mode} | ${formattedNetWorth} - Capital Allocator`;
+    }, [gameState?.level, gameState?.netWorth]);
 
     // Derived State helper
     const profit = gameState?.business ? (gameState.business.revenue - gameState.business.expensesTotal) : 0;
@@ -290,7 +310,7 @@ function App() {
             alert('Failed to unlock skill: ' + (e as any).response?.data?.error || 'Unknown error');
         }
     };
-    
+
     const handleStartChallenge = async (challengeId: string) => {
         if (!confirm("Starting a challenge will restart your game. Continue?")) return;
         try {
@@ -302,7 +322,7 @@ function App() {
             alert('Failed to start challenge: ' + (e as any).response?.data?.error || 'Unknown error');
         }
     };
-    
+
     const handleStartScenario = async (scenarioId: string) => {
         if (!confirm("Starting a scenario will restart your game. Continue?")) return;
         try {
@@ -372,11 +392,11 @@ function App() {
     return (
         <div className="flex h-screen bg-[#0a0b14] text-gray-100 font-sans selection:bg-blue-500/30 overflow-hidden">
             {/* Sidebar (Always Visible) */}
-            <PlayerSidebar 
-                player={gameState.player} 
-                lifestyle={gameState.lifestyle} 
+            <PlayerSidebar
+                player={gameState.player}
+                lifestyle={gameState.lifestyle}
                 retirement={gameState.retirement}
-                onRestart={handleRestart} 
+                onRestart={handleRestart}
             />
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -420,21 +440,19 @@ function App() {
                     <div className="px-6 flex gap-2">
                         <button
                             onClick={() => setActiveTab('game')}
-                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
-                                activeTab === 'game'
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'game'
                                     ? 'text-blue-400 border-b-2 border-blue-400'
                                     : 'text-gray-500 hover:text-gray-300'
-                            }`}
+                                }`}
                         >
                             Game
                         </button>
                         <button
                             onClick={() => setActiveTab('retirement')}
-                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-                                activeTab === 'retirement'
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'retirement'
                                     ? 'text-emerald-400 border-b-2 border-emerald-400'
                                     : 'text-gray-500 hover:text-gray-300'
-                            }`}
+                                }`}
                         >
                             <Shield size={14} />
                             Retirement
@@ -446,11 +464,10 @@ function App() {
                         </button>
                         <button
                             onClick={() => setActiveTab('skills')}
-                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
-                                activeTab === 'skills'
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'skills'
                                     ? 'text-blue-400 border-b-2 border-blue-400'
                                     : 'text-gray-500 hover:text-gray-300'
-                            }`}
+                                }`}
                         >
                             Skills {gameState.skills.skillPoints > 0 && (
                                 <span className="ml-1 px-1.5 py-0.5 bg-yellow-500/30 text-yellow-400 rounded text-xs">
@@ -460,11 +477,10 @@ function App() {
                         </button>
                         <button
                             onClick={() => setActiveTab('stats')}
-                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
-                                activeTab === 'stats'
+                            className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'stats'
                                     ? 'text-blue-400 border-b-2 border-blue-400'
                                     : 'text-gray-500 hover:text-gray-300'
-                            }`}
+                                }`}
                         >
                             Stats
                         </button>
@@ -481,206 +497,206 @@ function App() {
                         {gameState.activeScenario && (
                             <ScenarioProgress scenarioId={gameState.activeScenario} gameState={gameState} />
                         )}
-                        
+
                         {activeTab === 'game' && (
                             <>
-                        {gameState.level === 'Career' ? (
-                            <>
-                                <CareerDashboard
-                                    gameState={gameState}
-                                    onToggleStudy={handleToggleStudy}
-                                    onSelectJob={handleSelectJob}
-                                    onNextMonth={handleNextTurn}
-                                    onMakeDecision={handleMakeDecision}
-                                />
-                                {gameState.cash >= gameState.career.savingsGoal && (
-                                    <div className="fixed bottom-10 right-10 z-50 animate-in slide-in-from-bottom-10 fade-in duration-700">
-                                        <button
-                                            onClick={() => setShowBusinessSelector(true)}
-                                            className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xl rounded-full shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:scale-105 transition-all"
-                                        >
-                                            🚀 LAUNCH BUSINESS
-                                        </button>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            // BUSINESS DASHBOARD (Inline for now to save space in file)
-                            <div className="grid grid-cols-12 gap-6">
-                                <div className="col-span-12 lg:col-span-4 space-y-6">
-                                    <SectionHeader icon={<TrendingUp size={18} />} title={`${business?.type} Operations`} />
-
-                                    <div className="glass-card p-6 relative overflow-hidden group">
-                                        <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                                            <Briefcase size={100} />
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-y-6 gap-x-4 relative z-10">
-                                            <StatDisplay label="Revenue" value={business?.revenue ?? 0} type="currency" color="text-emerald-400" />
-                                            <StatDisplay label="Expenses" value={business?.expensesTotal ?? 0} type="currency" color="text-red-400" />
-
-                                            <div className="col-span-2 p-4 rounded-xl bg-black/20 border border-white/5">
-                                                <div className="flex justify-between items-end mb-1">
-                                                    <span className="text-sm text-gray-400">Net Operating Profit</span>
-                                                    <PercentBadge val={((profit / (business?.revenue || 1)) || 0) * 100} />
-                                                </div>
-                                                <div className={`text-3xl font-mono font-bold ${isProfitable ? 'text-emerald-400 text-glow' : 'text-red-500'}`}>
-                                                    {formatCurrency(profit)}
-                                                </div>
+                                {gameState.level === 'Career' ? (
+                                    <>
+                                        <CareerDashboard
+                                            gameState={gameState}
+                                            onToggleStudy={handleToggleStudy}
+                                            onSelectJob={handleSelectJob}
+                                            onNextMonth={handleNextTurn}
+                                            onMakeDecision={handleMakeDecision}
+                                        />
+                                        {gameState.cash >= gameState.career.savingsGoal && (
+                                            <div className="fixed bottom-10 right-10 z-50 animate-in slide-in-from-bottom-10 fade-in duration-700">
+                                                <button
+                                                    onClick={() => setShowBusinessSelector(true)}
+                                                    className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xl rounded-full shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:scale-105 transition-all"
+                                                >
+                                                    🚀 LAUNCH BUSINESS
+                                                </button>
                                             </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    // BUSINESS DASHBOARD (Inline for now to save space in file)
+                                    <div className="grid grid-cols-12 gap-6">
+                                        <div className="col-span-12 lg:col-span-4 space-y-6">
+                                            <SectionHeader icon={<TrendingUp size={18} />} title={`${business?.type} Operations`} />
 
-                                            <StatDisplay label="Customers" value={business?.demand ?? 0} type="number" suffix="/mo" />
-                                            <StatDisplay label="Capacity" value={business?.capacity ?? 0} type="number" suffix="units" />
-                                        </div>
-                                    </div>
+                                            <div className="glass-card p-6 relative overflow-hidden group">
+                                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                    <Briefcase size={100} />
+                                                </div>
 
-                                    <div className="glass-card p-6">
-                                        <h3 className="text-sm text-gray-400 uppercase tracking-widest font-bold mb-4">Operational Config</h3>
-                                        <div className="space-y-4">
-                                            <ConfigRow label="Product Price" value={formatCurrency(business?.prices ?? 0)} />
-                                            <ConfigRow label="Staff Count" value={business?.staff ?? 0} />
-                                            <ConfigRow label="Inventory Level" value={business?.inventory ?? 0} />
-                                        </div>
-                                    </div>
+                                                <div className="grid grid-cols-2 gap-y-6 gap-x-4 relative z-10">
+                                                    <StatDisplay label="Revenue" value={business?.revenue ?? 0} type="currency" color="text-emerald-400" />
+                                                    <StatDisplay label="Expenses" value={business?.expensesTotal ?? 0} type="currency" color="text-red-400" />
 
-                                    {/* Pending Decisions Section */}
-                                    {(business?.pendingDecisions?.length ?? 0) > 0 && (
-                                        <div className="glass-card p-4 border border-yellow-500/30 bg-yellow-500/5 relative z-10">
-                                            <div className="flex items-center gap-2 text-yellow-500 mb-2">
-                                                <AlertCircle size={20} />
-                                                <h3 className="font-bold">Decisions Required ({business!.pendingDecisions.length})</h3>
-                                            </div>
-                                            <div className="space-y-3">
-                                                {business!.pendingDecisions.map(d => (
-                                                    <div key={d.id} className="p-3 bg-black/40 rounded border border-white/10">
-                                                        <div className="font-bold text-sm text-white">{d.title}</div>
-                                                        <div className="text-xs text-gray-400 mb-2">{d.description}</div>
-                                                        <div className="grid grid-cols-1 gap-2">
-                                                            {d.options.map(opt => (
-                                                                <button key={opt.id} onClick={() => handleMakeDecision(d.id, opt.id)} className="text-xs bg-white/10 hover:bg-white/20 py-1.5 px-2 rounded text-left flex justify-between">
-                                                                    <span>{opt.label}</span>
-                                                                    <span className="text-gray-500">{opt.cost > 0 ? `-$${opt.cost}` : 'Free'}</span>
-                                                                </button>
-                                                            ))}
+                                                    <div className="col-span-2 p-4 rounded-xl bg-black/20 border border-white/5">
+                                                        <div className="flex justify-between items-end mb-1">
+                                                            <span className="text-sm text-gray-400">Net Operating Profit</span>
+                                                            <PercentBadge val={((profit / (business?.revenue || 1)) || 0) * 100} />
+                                                        </div>
+                                                        <div className={`text-3xl font-mono font-bold ${isProfitable ? 'text-emerald-400 text-glow' : 'text-red-500'}`}>
+                                                            {formatCurrency(profit)}
                                                         </div>
                                                     </div>
-                                                ))}
+
+                                                    <StatDisplay label="Customers" value={business?.demand ?? 0} type="number" suffix="/mo" />
+                                                    <StatDisplay label="Capacity" value={business?.capacity ?? 0} type="number" suffix="units" />
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
 
-                                <div className="col-span-12 lg:col-span-4 space-y-6">
-                                    <SectionHeader icon={<Activity size={18} />} title="Market Intelligence" />
-
-                                    <div className="glass-card p-6 border-t-4 border-t-blue-500/50">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div>
-                                                <div className="text-xs text-gray-400 uppercase mb-1">Global Economy</div>
-                                                <div className="text-2xl font-bold text-white">{market?.cycleStage}</div>
+                                            <div className="glass-card p-6">
+                                                <h3 className="text-sm text-gray-400 uppercase tracking-widest font-bold mb-4">Operational Config</h3>
+                                                <div className="space-y-4">
+                                                    <ConfigRow label="Product Price" value={formatCurrency(business?.prices ?? 0)} />
+                                                    <ConfigRow label="Staff Count" value={business?.staff ?? 0} />
+                                                    <ConfigRow label="Inventory Level" value={business?.inventory ?? 0} />
+                                                </div>
                                             </div>
-                                            <CycleIcon stage={market?.cycleStage ?? 'Recovery'} />
-                                        </div>
 
-                                        <div className="grid grid-cols-2 gap-4 mt-6">
-                                            <div className="bg-white/5 p-3 rounded-lg text-center">
-                                                <div className="text-xs text-gray-500">Interest Rate</div>
-                                                <div className="text-xl font-mono text-blue-300">{((market?.interestRate ?? 0) * 100).toFixed(2)}%</div>
-                                            </div>
-                                            <div className="bg-white/5 p-3 rounded-lg text-center">
-                                                <div className="text-xs text-gray-500">S&P 500</div>
-                                                <div className="text-xl font-mono text-purple-300">{(market?.stockMarketIndex ?? 0).toFixed(0)}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="glass-card p-0 overflow-hidden">
-                                        <div className="p-4 border-b border-white/5 bg-white/[0.02]">
-                                            <div className="flex justify-between items-center">
-                                                <span className="font-outfit font-bold">Portfolio Composition</span>
-                                                <BarChart3 size={16} className="text-gray-500" />
-                                            </div>
-                                        </div>
-                                        <div className="p-4 space-y-1">
-                                            <AssetItem 
-                                                name="Index Funds (S&P 500)" 
-                                                value={portfolio?.stocksValue ?? 0} 
-                                                total={netWorth} 
-                                                color="bg-purple-500" 
-                                                onSell={(amt: number) => handleSellAsset('STOCK', amt)}
-                                            />
-                                            <AssetItem 
-                                                name="Government Bonds" 
-                                                value={portfolio?.bondsValue ?? 0} 
-                                                total={netWorth} 
-                                                color="bg-yellow-500"
-                                                onSell={(amt: number) => handleSellAsset('BOND', amt)}
-                                            />
-                                            <AssetItem 
-                                                name="Real Estate" 
-                                                value={portfolio?.realEstateValue ?? 0} 
-                                                total={netWorth} 
-                                                color="bg-emerald-500"
-                                                onSell={(amt: number) => handleSellAsset('REAL_ESTATE', amt)}
-                                            />
-                                            <AssetItem 
-                                                name="Cash Reserves" 
-                                                value={cash} 
-                                                total={netWorth} 
-                                                color="bg-blue-500"
-                                            />
-                                        </div>
-
-                                        <div className="p-4 bg-black/20 border-t border-white/5">
-                                            <button
-                                                onClick={handleBuyStock}
-                                                disabled={cash < 5000}
-                                                className="w-full py-3 bg-white/5 hover:bg-blue-600 hover:text-white border border-white/10 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                                                <DollarSign size={18} /> Allocate $5k to Stocks
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="col-span-12 lg:col-span-4 flex flex-col h-[calc(100vh-140px)]">
-                                    <SectionHeader icon={<Calendar size={18} />} title="Event Log" />
-
-                                    <div className="glass-card flex-1 overflow-hidden flex flex-col">
-                                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                            {(events ?? []).slice().reverse().map((evt: any, idx: number) => (
-                                                <EventCard key={idx} evt={evt} />
-                                            ))}
-                                            {(events ?? []).length === 0 && (
-                                                <div className="flex flex-col items-center justify-center h-full text-gray-600 space-y-2">
-                                                    <AlertCircle size={32} />
-                                                    <span>No events recorded yet.</span>
+                                            {/* Pending Decisions Section */}
+                                            {(business?.pendingDecisions?.length ?? 0) > 0 && (
+                                                <div className="glass-card p-4 border border-yellow-500/30 bg-yellow-500/5 relative z-10">
+                                                    <div className="flex items-center gap-2 text-yellow-500 mb-2">
+                                                        <AlertCircle size={20} />
+                                                        <h3 className="font-bold">Decisions Required ({business!.pendingDecisions.length})</h3>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {business!.pendingDecisions.map(d => (
+                                                            <div key={d.id} className="p-3 bg-black/40 rounded border border-white/10">
+                                                                <div className="font-bold text-sm text-white">{d.title}</div>
+                                                                <div className="text-xs text-gray-400 mb-2">{d.description}</div>
+                                                                <div className="grid grid-cols-1 gap-2">
+                                                                    {d.options.map(opt => (
+                                                                        <button key={opt.id} onClick={() => handleMakeDecision(d.id, opt.id)} className="text-xs bg-white/10 hover:bg-white/20 py-1.5 px-2 rounded text-left flex justify-between">
+                                                                            <span>{opt.label}</span>
+                                                                            <span className="text-gray-500">{opt.cost > 0 ? `-$${opt.cost}` : 'Free'}</span>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
 
-                                    <button
-                                        onClick={handleNextTurn}
-                                        disabled={processing || ((business?.pendingDecisions?.length ?? 0) > 0)}
-                                        className={`mt-6 w-full py-4 text-xl font-bold rounded-xl shadow-lg transform transition-all flex items-center justify-center gap-3 ${((business?.pendingDecisions?.length ?? 0) > 0)
-                                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50 shadow-none'
-                                            : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white hover:-translate-y-1 shadow-emerald-500/20'
-                                            }`}
-                                    >
-                                        {processing ? (
-                                            <>Processing <span className="animate-spin">⟳</span></>
-                                        ) : ((business?.pendingDecisions?.length ?? 0) > 0) ? (
-                                            <><AlertCircle size={24} /> DECISIONS REQUIRED</>
-                                        ) : (
-                                            <>PROCESS MONTH <ArrowUpRight strokeWidth={3} /></>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                                        <div className="col-span-12 lg:col-span-4 space-y-6">
+                                            <SectionHeader icon={<Activity size={18} />} title="Market Intelligence" />
+
+                                            <div className="glass-card p-6 border-t-4 border-t-blue-500/50">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div>
+                                                        <div className="text-xs text-gray-400 uppercase mb-1">Global Economy</div>
+                                                        <div className="text-2xl font-bold text-white">{market?.cycleStage}</div>
+                                                    </div>
+                                                    <CycleIcon stage={market?.cycleStage ?? 'Recovery'} />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 mt-6">
+                                                    <div className="bg-white/5 p-3 rounded-lg text-center">
+                                                        <div className="text-xs text-gray-500">Interest Rate</div>
+                                                        <div className="text-xl font-mono text-blue-300">{((market?.interestRate ?? 0) * 100).toFixed(2)}%</div>
+                                                    </div>
+                                                    <div className="bg-white/5 p-3 rounded-lg text-center">
+                                                        <div className="text-xs text-gray-500">S&P 500</div>
+                                                        <div className="text-xl font-mono text-purple-300">{(market?.stockMarketIndex ?? 0).toFixed(0)}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="glass-card p-0 overflow-hidden">
+                                                <div className="p-4 border-b border-white/5 bg-white/[0.02]">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="font-outfit font-bold">Portfolio Composition</span>
+                                                        <BarChart3 size={16} className="text-gray-500" />
+                                                    </div>
+                                                </div>
+                                                <div className="p-4 space-y-1">
+                                                    <AssetItem
+                                                        name="Index Funds (S&P 500)"
+                                                        value={portfolio?.stocksValue ?? 0}
+                                                        total={netWorth}
+                                                        color="bg-purple-500"
+                                                        onSell={(amt: number) => handleSellAsset('STOCK', amt)}
+                                                    />
+                                                    <AssetItem
+                                                        name="Government Bonds"
+                                                        value={portfolio?.bondsValue ?? 0}
+                                                        total={netWorth}
+                                                        color="bg-yellow-500"
+                                                        onSell={(amt: number) => handleSellAsset('BOND', amt)}
+                                                    />
+                                                    <AssetItem
+                                                        name="Real Estate"
+                                                        value={portfolio?.realEstateValue ?? 0}
+                                                        total={netWorth}
+                                                        color="bg-emerald-500"
+                                                        onSell={(amt: number) => handleSellAsset('REAL_ESTATE', amt)}
+                                                    />
+                                                    <AssetItem
+                                                        name="Cash Reserves"
+                                                        value={cash}
+                                                        total={netWorth}
+                                                        color="bg-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div className="p-4 bg-black/20 border-t border-white/5">
+                                                    <button
+                                                        onClick={handleBuyStock}
+                                                        disabled={cash < 5000}
+                                                        className="w-full py-3 bg-white/5 hover:bg-blue-600 hover:text-white border border-white/10 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                                        <DollarSign size={18} /> Allocate $5k to Stocks
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="col-span-12 lg:col-span-4 flex flex-col h-[calc(100vh-140px)]">
+                                            <SectionHeader icon={<Calendar size={18} />} title="Event Log" />
+
+                                            <div className="glass-card flex-1 overflow-hidden flex flex-col">
+                                                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                                    {(events ?? []).slice().reverse().map((evt: any, idx: number) => (
+                                                        <EventCard key={idx} evt={evt} />
+                                                    ))}
+                                                    {(events ?? []).length === 0 && (
+                                                        <div className="flex flex-col items-center justify-center h-full text-gray-600 space-y-2">
+                                                            <AlertCircle size={32} />
+                                                            <span>No events recorded yet.</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={handleNextTurn}
+                                                disabled={processing || ((business?.pendingDecisions?.length ?? 0) > 0)}
+                                                className={`mt-6 w-full py-4 text-xl font-bold rounded-xl shadow-lg transform transition-all flex items-center justify-center gap-3 ${((business?.pendingDecisions?.length ?? 0) > 0)
+                                                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50 shadow-none'
+                                                    : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white hover:-translate-y-1 shadow-emerald-500/20'
+                                                    }`}
+                                            >
+                                                {processing ? (
+                                                    <>Processing <span className="animate-spin">⟳</span></>
+                                                ) : ((business?.pendingDecisions?.length ?? 0) > 0) ? (
+                                                    <><AlertCircle size={24} /> DECISIONS REQUIRED</>
+                                                ) : (
+                                                    <>PROCESS MONTH <ArrowUpRight strokeWidth={3} /></>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
-                        
+
                         {activeTab === 'retirement' && (
                             <div className="space-y-6">
                                 <RetirementNotifications
@@ -706,22 +722,22 @@ function App() {
                                 />
                             </div>
                         )}
-                        
+
                         {activeTab === 'skills' && (
-                            <SkillTree 
-                                skills={gameState.skills} 
+                            <SkillTree
+                                skills={gameState.skills}
                                 onUnlockSkill={handleUnlockSkill}
                             />
                         )}
-                        
+
                         {activeTab === 'stats' && (
                             <div className="space-y-6">
-                                <VisualProgression 
+                                <VisualProgression
                                     netWorth={gameState.netWorth}
                                     lifestyle={gameState.lifestyle.tier}
                                     level={gameState.level}
                                 />
-                                <NetWorthChart 
+                                <NetWorthChart
                                     netWorthHistory={gameState.netWorthHistory}
                                     currentNetWorth={gameState.netWorth}
                                     currentMonth={gameState.month}
@@ -810,7 +826,7 @@ function App() {
                     </div>
                 </div>
             )}
-            
+
             {/* Challenge Selector Modal */}
             {showChallengeSelector && (
                 <ChallengeSelector
@@ -818,7 +834,7 @@ function App() {
                     onClose={() => setShowChallengeSelector(false)}
                 />
             )}
-            
+
             {/* Scenario Selector Modal */}
             {showScenarioSelector && (
                 <ScenarioSelector
@@ -826,7 +842,7 @@ function App() {
                     onClose={() => setShowScenarioSelector(false)}
                 />
             )}
-            
+
             {/* Retirement Tutorial Modal */}
             {showRetirementTutorial && gameState && (
                 <RetirementTutorial
