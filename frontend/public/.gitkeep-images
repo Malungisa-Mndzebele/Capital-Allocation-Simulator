@@ -1,0 +1,29 @@
+# Missing Images
+
+## Required for SEO:
+
+1. **og-image.png** (CRITICAL)
+   - Size: 1200x630px
+   - Format: PNG or JPG
+   - Max size: < 1MB
+   - Purpose: Social media sharing (Facebook, Twitter, LinkedIn)
+   - Content: Game logo, tagline, compelling visuals
+   
+2. **favicon.png** (if missing)
+   - Size: 32x32px or 192x192px
+   - Format: PNG
+   - Purpose: Browser tab icon
+
+## How to Create og-image.png:
+
+Use a design tool (Canva, Figma, Photoshop) to create:
+- Background: Dark theme matching game aesthetic
+- Logo: "Capital Allocation Simulator"
+- Tagline: "Master Corporate Finance Strategy"
+- Visual: Financial charts, business icons, or game screenshot
+- Text: Large, readable at small sizes
+
+## Temporary Workaround:
+
+Until og-image.png is created, the meta tags will reference a non-existent image.
+Social media platforms will show a generic preview without an image.
