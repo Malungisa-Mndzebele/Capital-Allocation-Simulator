@@ -28,8 +28,9 @@ export class RetirementLogic {
             oldMarketIndex
         );
 
-        // Check if we need to reset annual contributions (new calendar year)
-        const currentYear = Math.floor(currentMonth / 12);
+        // Check if we need to reset annual contributions (new calendar year).
+        // Year N spans months (N-1)*12+1 .. N*12, so month 1-12 = year 1, month 13 = year 2.
+        const currentYear = Math.ceil(currentMonth / 12);
         if (newState.lastResetYear < currentYear) {
             newState = this.resetAnnualContributions(newState, currentYear);
         }

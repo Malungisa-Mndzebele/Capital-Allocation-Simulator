@@ -5,27 +5,42 @@ import type { RetirementState, CareerState } from '../types';
 
 describe('RetirementNotifications', () => {
   const mockCareerWith401k: CareerState = {
-    currentJob: 'Software Engineer',
+    jobTitle: 'Software Engineer',
     salary: 100000,
-    yearsExperience: 5,
+    educationLevel: 'Bachelor',
+    tuitionCost: 0,
+    studyProgress: 0,
+    isStudying: false,
+    expensesLiving: 0,
+    savingsGoal: 10000,
+    pendingDecisions: [],
     has401k: true,
     matchPercentage: 100,
     matchLimit: 6,
+    vestingYears: 4,
   };
 
   const mockCareerWithout401k: CareerState = {
-    currentJob: 'Freelancer',
+    jobTitle: 'Freelancer',
     salary: 80000,
-    yearsExperience: 3,
+    educationLevel: 'Bachelor',
+    tuitionCost: 0,
+    studyProgress: 0,
+    isStudying: false,
+    expensesLiving: 0,
+    savingsGoal: 10000,
+    pendingDecisions: [],
     has401k: false,
     matchPercentage: 0,
     matchLimit: 0,
+    vestingYears: 0,
   };
 
   const mockRetirementEmpty: RetirementState = {
     accounts: [],
     currentYearContributions401k: 0,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   const mockRetirementWith401kBelowMatch: RetirementState = {
@@ -49,6 +64,7 @@ describe('RetirementNotifications', () => {
     ],
     currentYearContributions401k: 3000,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   const mockRetirementWith401kMaxMatch: RetirementState = {
@@ -72,11 +88,12 @@ describe('RetirementNotifications', () => {
     ],
     currentYearContributions401k: 6000,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   describe('No Notifications', () => {
     it('should render nothing when no notifications are needed', () => {
-      const { container } = render(
+      render(
         <RetirementNotifications
           retirement={mockRetirementWith401kMaxMatch}
           career={mockCareerWith401k}
@@ -147,9 +164,11 @@ describe('RetirementNotifications', () => {
 
       expect(screen.getByText('Leaving Money on the Table')).toBeInTheDocument();
       // Use getAllByText since the text appears in multiple notification cards
-      const elements = screen.getAllByText((content, element) => {
-        return element?.textContent?.includes('missing out on $3000/year') || 
-               element?.textContent?.includes('missing out on $3,000/year');
+      const elements = screen.getAllByText((_content, element) => {
+        return Boolean(
+          element?.textContent?.includes('missing out on $3000/year') ||
+          element?.textContent?.includes('missing out on $3,000/year')
+        );
       });
       expect(elements.length).toBeGreaterThan(0);
     });
@@ -220,6 +239,7 @@ describe('RetirementNotifications', () => {
         ],
         currentYearContributions401k: 0,
         currentYearContributionsIRA: 0,
+        lastResetYear: 1,
       };
 
       render(
@@ -258,6 +278,7 @@ describe('RetirementNotifications', () => {
         ],
         currentYearContributions401k: 0,
         currentYearContributionsIRA: 0,
+        lastResetYear: 1,
       };
 
       render(

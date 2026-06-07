@@ -51,13 +51,13 @@ describe('RetirementTutorial', () => {
 
       expect(screen.getByText('Free Money: Employer Match!')).toBeInTheDocument();
       // Use getAllByText since text appears in multiple places in the tutorial
-      const matchElements = screen.getAllByText((content, element) => {
-        return element?.textContent?.includes('Your employer will match 100%');
+      const matchElements = screen.getAllByText((_content, element) => {
+        return Boolean(element?.textContent?.includes('Your employer will match 100%'));
       });
       expect(matchElements.length).toBeGreaterThan(0);
-      
-      const limitElements = screen.getAllByText((content, element) => {
-        return element?.textContent?.includes('up to 6%');
+
+      const limitElements = screen.getAllByText((_content, element) => {
+        return Boolean(element?.textContent?.includes('up to 6%'));
       });
       expect(limitElements.length).toBeGreaterThan(0);
     });
@@ -225,8 +225,8 @@ describe('RetirementTutorial', () => {
       );
 
       // Use getAllByText since text appears in multiple places
-      const elements = screen.getAllByText((content, element) => {
-        return element?.textContent?.includes('Your employer will match 50%');
+      const elements = screen.getAllByText((_content, element) => {
+        return Boolean(element?.textContent?.includes('Your employer will match 50%'));
       });
       expect(elements.length).toBeGreaterThan(0);
     });
@@ -243,8 +243,8 @@ describe('RetirementTutorial', () => {
       );
 
       // Use getAllByText since text appears in multiple places
-      const elements = screen.getAllByText((content, element) => {
-        return element?.textContent?.includes('up to 4%');
+      const elements = screen.getAllByText((_content, element) => {
+        return Boolean(element?.textContent?.includes('up to 4%'));
       });
       expect(elements.length).toBeGreaterThan(0);
       expect(screen.getByText(/Always contribute at least 4% to maximize your employer match!/)).toBeInTheDocument();

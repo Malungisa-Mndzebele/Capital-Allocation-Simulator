@@ -349,7 +349,7 @@ function App() {
     const handleSetContributionRate = async (accountId: string, rate: number) => {
         if (!gameState) return;
         try {
-            const newState = await performAction(userId, 'SET_CONTRIBUTION_RATE', { accountId, rate });
+            const newState = await performAction(userId, 'SET_CONTRIBUTION_RATE', { accountId, contributionRate: rate });
             setGameState(newState);
         } catch (e) {
             console.error(e);

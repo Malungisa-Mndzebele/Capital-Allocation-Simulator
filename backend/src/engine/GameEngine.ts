@@ -8,7 +8,7 @@ import { RetirementLogic } from './systems/RetirementLogic';
 import { PersonalityLogic } from './systems/PersonalityLogic';
 import { SkillTreeLogic } from './systems/SkillTreeLogic';
 import { ChallengeMode, CHALLENGES } from './systems/ChallengeMode';
-// import { ScenarioMode, SCENARIOS } from './systems/ScenarioMode'; // Temporarily disabled due to file issue
+import { ScenarioMode, SCENARIOS } from './systems/ScenarioMode';
 import { TAX_RATE, RELATIONSHIP_COSTS, CHILD_COST_PER_MONTH, LIFESTYLE_TIERS, RETIREMENT_LIMITS } from './config';
 import { checkAchievements } from './achievements';
 
@@ -313,15 +313,9 @@ export class GameEngine {
             
             // Add passive income from skills (Life Coach)
             const passiveIncome = SkillTreeLogic.getPassiveIncome(newState.skills);
-            
-            // Roth IRA contributions are after-tax
-            const afterTaxContributions = newState.retirement.accounts
-                .filter(acc => acc.isActive && acc.type === 'roth_ira')
-                .reduce((sum, acc) => {
-                    const accountIndex = newState.retirement.accounts.findIndex(a => a.id === acc.id);
-                    return sum + (newState.retirement.accounts[accountIndex].annualContributions / 12);
-                }, 0);
-            
+
+            // Roth IRA contributions are after-tax and already included in
+            // totalRetirementContributions (they leave cash but don't reduce taxable income).
             const monthlyNet = adjustedGrossMonthly - tax - tuition - totalExpenses + passiveIncome - totalRetirementContributions;
 
             newState.cash += monthlyNet;
@@ -593,11 +587,9 @@ export class GameEngine {
             }
         }
         
-        // Check scenario completion
-        // Temporarily disabled due to ScenarioMode file issue
-        /*
+        // Check scenario completion / failure
         if (newState.activeScenario) {
-            const scenario = SCENARIOS.find((s: any) => s.id === newState.activeScenario);
+            const scenario = SCENARIOS.find(s => s.id === newState.activeScenario);
             if (scenario) {
                 const completion = ScenarioMode.checkScenarioCompletion(scenario, newState);
                 if (completion.completed) {
@@ -615,7 +607,6 @@ export class GameEngine {
                 }
             }
         }
-        */
 
         return newState;
     }

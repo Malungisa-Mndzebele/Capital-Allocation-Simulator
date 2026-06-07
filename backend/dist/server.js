@@ -506,14 +506,19 @@ app.post('/api/game/action', async (req, res) => {
             if (!isString(scenarioId)) {
                 return res.status(400).json({ error: 'scenarioId is required' });
             }
-            const scenario = ScenarioMode_1.SCENARIOS.find((s) => s.id === scenarioId);
+            const scenario = ScenarioMode_1.SCENARIOS.find(s => s.id === scenarioId);
             if (!scenario) {
                 return res.status(400).json({ error: 'Invalid scenario ID' });
             }
-            // Create base state and apply scenario
+            // Create base state and apply scenario starting conditions
             const baseState = GameEngine_1.GameEngine.getInitialState('Normal');
             const newState = ScenarioMode_1.ScenarioMode.applyScenario(scenario, baseState);
             newState.activeScenario = scenarioId;
+            newState.events.push({
+                month: newState.month,
+                description: `📖 Scenario Started: ${scenario.name}`,
+                impact: scenario.goal.description
+            });
             const updated = await prisma.gameSession.update({ where: { userId }, data: { gameState: newState } });
             return res.json(updated.gameState);
         }
@@ -607,8 +612,9 @@ app.post('/api/game/action', async (req, res) => {
             if (amount > account.balance) {
                 return res.status(400).json({ error: 'Insufficient balance in retirement account' });
             }
-            // Calculate player age from month (assuming month 1 = age 18)
-            const playerAge = 18 + (state.month / 12);
+            // Player age, consistent with GameEngine's month basis (month 1 = age 17).
+            // Kept fractional here so the 59.5 penalty-free threshold is evaluated precisely.
+            const playerAge = 17 + (state.month - 1) / 12;
             // Process withdrawal with penalties and taxes
             const withdrawalResult = RetirementLogic_1.RetirementLogic.processWithdrawal(account, amount, playerAge, 0.20 // Using standard tax rate from config
             );

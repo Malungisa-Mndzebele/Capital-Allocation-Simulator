@@ -8,6 +8,7 @@ describe('RetirementDashboard', () => {
     accounts: [],
     currentYearContributions401k: 0,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   const mockRetirementWith401k: RetirementState = {
@@ -31,6 +32,7 @@ describe('RetirementDashboard', () => {
     ],
     currentYearContributions401k: 6000,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   const mockRetirementMultipleAccounts: RetirementState = {
@@ -86,6 +88,7 @@ describe('RetirementDashboard', () => {
     ],
     currentYearContributions401k: 10000,
     currentYearContributionsIRA: 7000,
+    lastResetYear: 1,
   };
 
   describe('Empty State', () => {
@@ -316,6 +319,7 @@ describe('RetirementDashboard', () => {
         ],
         currentYearContributions401k: 0,
         currentYearContributionsIRA: 0,
+        lastResetYear: 1,
       };
 
       render(

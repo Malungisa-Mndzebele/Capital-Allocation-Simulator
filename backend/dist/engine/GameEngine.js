@@ -258,13 +258,8 @@ class GameEngine {
             const tuition = newState.career.isStudying ? newState.career.tuitionCost : 0;
             // Add passive income from skills (Life Coach)
             const passiveIncome = SkillTreeLogic_1.SkillTreeLogic.getPassiveIncome(newState.skills);
-            // Roth IRA contributions are after-tax
-            const afterTaxContributions = newState.retirement.accounts
-                .filter(acc => acc.isActive && acc.type === 'roth_ira')
-                .reduce((sum, acc) => {
-                const accountIndex = newState.retirement.accounts.findIndex(a => a.id === acc.id);
-                return sum + (newState.retirement.accounts[accountIndex].annualContributions / 12);
-            }, 0);
+            // Roth IRA contributions are after-tax and already included in
+            // totalRetirementContributions (they leave cash but don't reduce taxable income).
             const monthlyNet = adjustedGrossMonthly - tax - tuition - totalExpenses + passiveIncome - totalRetirementContributions;
             newState.cash += monthlyNet;
             // Add event for retirement contributions if any were made
@@ -496,9 +491,9 @@ class GameEngine {
                 // Don't clear challenge - let player continue with restrictions if they want
             }
         }
-        // Check scenario completion
+        // Check scenario completion / failure
         if (newState.activeScenario) {
-            const scenario = ScenarioMode_1.SCENARIOS.find((s) => s.id === newState.activeScenario);
+            const scenario = ScenarioMode_1.SCENARIOS.find(s => s.id === newState.activeScenario);
             if (scenario) {
                 const completion = ScenarioMode_1.ScenarioMode.checkScenarioCompletion(scenario, newState);
                 if (completion.completed) {

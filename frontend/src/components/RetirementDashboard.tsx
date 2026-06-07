@@ -53,8 +53,7 @@ export const RetirementDashboard: React.FC<RetirementDashboardProps> = ({
     grossIncome 
 }) => {
     const totalRetirementBalance = retirement.accounts.reduce((sum, acc) => sum + acc.balance, 0);
-    const activeAccounts = retirement.accounts.filter(acc => acc.isActive);
-    
+
     // Calculate contribution limits
     const limit401k = getContributionLimit('401k', playerAge);
     const limitIRA = getContributionLimit('traditional_ira', playerAge);

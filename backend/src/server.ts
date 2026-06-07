@@ -13,7 +13,7 @@ import { CareerLogic } from './engine/systems/CareerLogic';
 import { PersonalityLogic } from './engine/systems/PersonalityLogic';
 import { SkillTreeLogic, SKILL_TREE } from './engine/systems/SkillTreeLogic';
 import { ChallengeMode, CHALLENGES } from './engine/systems/ChallengeMode';
-// import { ScenarioMode, SCENARIOS } from './engine/systems/ScenarioMode'; // Temporarily disabled
+import { ScenarioMode, SCENARIOS } from './engine/systems/ScenarioMode';
 import { RetirementLogic } from './engine/systems/RetirementLogic';
 
 const app = express();
@@ -540,28 +540,31 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
             return res.json(updated.gameState);
         }
         
-        // --- START_SCENARIO --- Temporarily disabled
-        /*
+        // --- START_SCENARIO ---
         if (action === 'START_SCENARIO') {
             const scenarioId = payload?.scenarioId;
             if (!isString(scenarioId)) {
                 return res.status(400).json({ error: 'scenarioId is required' });
             }
-            
-            const scenario = SCENARIOS.find((s: any) => s.id === scenarioId);
+
+            const scenario = SCENARIOS.find(s => s.id === scenarioId);
             if (!scenario) {
                 return res.status(400).json({ error: 'Invalid scenario ID' });
             }
-            
-            // Create base state and apply scenario
+
+            // Create base state and apply scenario starting conditions
             const baseState = GameEngine.getInitialState('Normal');
             const newState = ScenarioMode.applyScenario(scenario, baseState);
             newState.activeScenario = scenarioId;
-            
+            newState.events.push({
+                month: newState.month,
+                description: `📖 Scenario Started: ${scenario.name}`,
+                impact: scenario.goal.description
+            });
+
             const updated = await prisma!.gameSession.update({ where: { userId }, data: { gameState: newState as any } });
             return res.json(updated.gameState);
         }
-        */
 
         // --- OPEN_RETIREMENT_ACCOUNT ---
         if (action === 'OPEN_RETIREMENT_ACCOUNT') {
@@ -676,8 +679,9 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'Insufficient balance in retirement account' });
             }
             
-            // Calculate player age from month (assuming month 1 = age 18)
-            const playerAge = 18 + (state.month / 12);
+            // Player age, consistent with GameEngine's month basis (month 1 = age 17).
+            // Kept fractional here so the 59.5 penalty-free threshold is evaluated precisely.
+            const playerAge = 17 + (state.month - 1) / 12;
             
             // Process withdrawal with penalties and taxes
             const withdrawalResult = RetirementLogic.processWithdrawal(

@@ -6,41 +6,68 @@ import type { RetirementState, CareerState, BusinessState } from '../types';
 
 describe('RetirementActions', () => {
   const mockCareerWith401k: CareerState = {
-    currentJob: 'Software Engineer',
+    jobTitle: 'Software Engineer',
     salary: 100000,
-    yearsExperience: 5,
+    educationLevel: 'Bachelor',
+    tuitionCost: 0,
+    studyProgress: 0,
+    isStudying: false,
+    expensesLiving: 0,
+    savingsGoal: 10000,
+    pendingDecisions: [],
     has401k: true,
     matchPercentage: 100,
     matchLimit: 6,
+    vestingYears: 4,
   };
 
   const mockCareerWithout401k: CareerState = {
-    currentJob: 'Freelancer',
+    jobTitle: 'Freelancer',
     salary: 80000,
-    yearsExperience: 3,
+    educationLevel: 'Bachelor',
+    tuitionCost: 0,
+    studyProgress: 0,
+    isStudying: false,
+    expensesLiving: 0,
+    savingsGoal: 10000,
+    pendingDecisions: [],
     has401k: false,
     matchPercentage: 0,
     matchLimit: 0,
+    vestingYears: 0,
   };
 
   const mockBusinessActive: BusinessState = {
-    type: 'tech_startup',
+    type: 'Tech',
     revenue: 50000,
-    expenses: 30000,
-    employees: 2,
+    expensesTotal: 30000,
+    staff: 2,
+    prices: 30,
+    demand: 1000,
+    capacity: 10000,
+    inventory: 0,
+    pendingDecisions: [],
+    hasSolo401k: false,
   };
 
   const mockBusinessInactive: BusinessState = {
-    type: undefined,
+    type: 'Retail',
     revenue: 0,
-    expenses: 0,
-    employees: 0,
+    expensesTotal: 0,
+    staff: 0,
+    prices: 0,
+    demand: 0,
+    capacity: 0,
+    inventory: 0,
+    pendingDecisions: [],
+    hasSolo401k: false,
   };
 
   const mockRetirementEmpty: RetirementState = {
     accounts: [],
     currentYearContributions401k: 0,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   const mockRetirementWith401k: RetirementState = {
@@ -64,6 +91,7 @@ describe('RetirementActions', () => {
     ],
     currentYearContributions401k: 6000,
     currentYearContributionsIRA: 0,
+    lastResetYear: 1,
   };
 
   const mockOnOpenAccount = vi.fn();
