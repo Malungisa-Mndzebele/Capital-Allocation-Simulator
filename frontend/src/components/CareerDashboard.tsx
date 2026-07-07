@@ -1,274 +1,179 @@
 import React from 'react';
 import type { GameState } from '../types';
-import { Briefcase, GraduationCap, DollarSign, ArrowRight, AlertCircle, Shield } from 'lucide-react';
+import { GraduationCap, Target, AlertCircle, Home } from 'lucide-react';
+import { LIFESTYLE_TIERS, TAX_RATE } from '../engine/config';
+import { formatCurrency, Section, Stat, Bar } from './ui';
 
 interface CareerDashboardProps {
     gameState: GameState;
     onToggleStudy: () => void;
     onSelectJob: (job: string) => void;
-    onNextMonth: () => void;
-    onMakeDecision?: (decisionId: string, optionId: string) => void;
+    onMakeDecision: (decisionId: string, optionId: string) => void;
+    onUpdateLifestyle: (tier: string) => void;
 }
 
-export const CareerDashboard: React.FC<CareerDashboardProps> = ({ gameState, onToggleStudy, onSelectJob, onNextMonth, onMakeDecision }) => {
-    const { career, cash, month, retirement } = gameState;
-    const progressPercent = (career.studyProgress / 12) * 100; // Simplified 12-month per degree step for UI
-    const savingsPercent = Math.min((cash / career.savingsGoal) * 100, 100);
-    const hasJob = career.jobTitle !== '';
+const JOBS = [
+    { id: 'Fast Food', emoji: '🍟', title: 'Fast Food Crew', pay: 18000, note: 'Low stress, dead end.' },
+    { id: 'Warehouse', emoji: '📦', title: 'Warehouse Ops', pay: 24000, note: 'Physical labor, steady pay.' },
+    { id: 'Sales', emoji: '💼', title: 'Door-to-Door Sales', pay: 30000, note: 'High burnout, high potential.' },
+];
 
-    // Calculate retirement contributions
-    const activeRetirementAccounts = retirement?.accounts.filter(acc => acc.isActive) || [];
-    const total401kContribution = activeRetirementAccounts
-        .filter(acc => acc.type === '401k' || acc.type === 'solo_401k')
-        .reduce((sum, acc) => sum + ((career.salary / 12) * (acc.contributionRate / 100)), 0);
-    const totalIRAContribution = activeRetirementAccounts
-        .filter(acc => acc.type === 'traditional_ira' || acc.type === 'roth_ira')
-        .reduce((sum, acc) => sum + ((career.salary / 12) * (acc.contributionRate / 100)), 0);
-    const totalEmployerMatch = activeRetirementAccounts
-        .filter(acc => acc.employerMatch > 0)
-        .reduce((sum, acc) => {
-            const employeeContribution = (career.salary / 12) * (acc.contributionRate / 100);
-            return sum + Math.min(
-                employeeContribution * (acc.employerMatch / 100),
-                (career.salary / 12) * (acc.employerMatchLimit / 100)
-            );
-        }, 0);
+const LIFESTYLE_OPTIONS = ['Frugal', 'Moderate', 'Luxury'] as const;
+
+export const CareerDashboard: React.FC<CareerDashboardProps> = ({
+    gameState, onToggleStudy, onSelectJob, onMakeDecision, onUpdateLifestyle,
+}) => {
+    const { career, cash, lifestyle } = gameState;
+    const hasJob = career.jobTitle !== '';
+    const savingsPercent = Math.min((cash / career.savingsGoal) * 100, 100);
+    const monthlyLiving = lifestyle.rent + lifestyle.food + lifestyle.transport + lifestyle.entertainment;
+    const grossMonthly = career.salary / 12;
+    const netMonthly = grossMonthly * (1 - TAX_RATE) - monthlyLiving - (career.isStudying ? career.tuitionCost : 0);
+
+    // ── First-time job selection ──────────────────────────
+    if (!hasJob) {
+        return (
+            <div className="max-w-2xl mx-auto">
+                <div className="text-center mb-8">
+                    <h1 className="text-3xl font-black text-white mb-2">Welcome to The Grind</h1>
+                    <p className="text-slate-400">
+                        You're 17 with {formatCurrency(cash)} to your name. Pick a first job to start earning —
+                        your goal is to save {formatCurrency(career.savingsGoal)} and launch a business.
+                    </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {JOBS.map(job => (
+                        <button
+                            key={job.id}
+                            onClick={() => onSelectJob(job.id)}
+                            className="panel-raised p-6 text-center hover:border-blue-500/50 hover:bg-white/[0.06] transition-all"
+                        >
+                            <div className="text-3xl mb-3">{job.emoji}</div>
+                            <div className="font-bold text-white mb-1">{job.title}</div>
+                            <div className="money text-blue-400 mb-2">{formatCurrency(job.pay)}<span className="text-xs text-slate-500">/yr</span></div>
+                            <div className="text-xs text-slate-500">{job.note}</div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto w-full text-blue-100">
-            {/* Header / Stats */}
-            {!hasJob ? (
-                <div className="glass-panel p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
-                    <h1 className="text-3xl font-bold text-white mb-2">Welcome to The Grind</h1>
-                    <p className="text-gray-400 mb-8 max-w-lg">You are 17 years old with $0 to your name. You need to start earning money immediately to cover living expenses.</p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                        <button onClick={() => onSelectJob('Fast Food')} className="p-6 rounded-xl bg-white/5 border border-white/10 hover:border-orange-500 hover:bg-orange-500/10 transition-all group">
-                            <div className="text-2xl mb-2">🍟</div>
-                            <div className="text-lg font-bold text-white mb-1">Fast Food Crew</div>
-                            <div className="text-orange-400 font-mono">$18,000/yr</div>
-                            <div className="text-xs text-gray-500 mt-2">Low stress, dead end.</div>
-                        </button>
-
-                        <button onClick={() => onSelectJob('Warehouse')} className="p-6 rounded-xl bg-white/5 border border-white/10 hover:border-blue-500 hover:bg-blue-500/10 transition-all group">
-                            <div className="text-2xl mb-2">📦</div>
-                            <div className="text-lg font-bold text-white mb-1">Warehouse Ops</div>
-                            <div className="text-blue-400 font-mono">$24,000/yr</div>
-                            <div className="text-xs text-gray-500 mt-2">Physical labor, steady pay.</div>
-                        </button>
-
-                        <button onClick={() => onSelectJob('Sales')} className="p-6 rounded-xl bg-white/5 border border-white/10 hover:border-green-500 hover:bg-green-500/10 transition-all group">
-                            <div className="text-2xl mb-2">💼</div>
-                            <div className="text-lg font-bold text-white mb-1">Door-to-Door Sales</div>
-                            <div className="text-green-400 font-mono">$30,000/yr</div>
-                            <div className="text-xs text-gray-500 mt-2">High burnout, high potential.</div>
-                        </button>
+        <div className="space-y-6">
+            {/* Pending life decisions */}
+            {career.pendingDecisions.length > 0 && (
+                <Section icon={<AlertCircle size={16} className="text-amber-400" />} title="Life Decisions">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {career.pendingDecisions.map(d => (
+                            <div key={d.id} className="bg-black/30 border border-amber-500/20 rounded-xl p-3">
+                                <div className="font-bold text-white text-sm">{d.title}</div>
+                                <p className="text-xs text-slate-400 mb-3">{d.description}</p>
+                                <div className="space-y-2">
+                                    {d.options.map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => onMakeDecision(d.id, opt.id)}
+                                            className="btn-ghost text-xs w-full py-2 px-3 justify-between"
+                                        >
+                                            <span>{opt.label}</span>
+                                            {opt.cost !== 0 && (
+                                                <span className={`font-mono ${opt.cost > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                    {opt.cost > 0 ? `-$${opt.cost}` : `+$${Math.abs(opt.cost)}`}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                </div>
-            ) : (
-                <>
-                    {/* PENDING DECISIONS */}
-                    {career?.pendingDecisions?.length > 0 && (
-                        <div className="w-full glass-card p-6 border border-yellow-500/30 bg-yellow-500/5 mb-6 relative z-10">
-                            <div className="flex items-center gap-2 text-yellow-400 mb-4">
-                                <AlertCircle size={24} />
-                                <h2 className="text-xl font-bold uppercase tracking-widest">Life Decisions</h2>
-                            </div>
+                </Section>
+            )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {career.pendingDecisions.map(d => (
-                                    <div key={d.id} className="bg-black/40 p-4 rounded border border-white/10">
-                                        <h3 className="font-bold text-white mb-1">{d.title}</h3>
-                                        <p className="text-sm text-gray-400 mb-4">{d.description}</p>
-                                        <div className="space-y-2">
-                                            {d.options.map(opt => (
-                                                <button
-                                                    key={opt.id}
-                                                    onClick={() => onMakeDecision && onMakeDecision(d.id, opt.id)}
-                                                    className="w-full p-2 text-sm bg-white/10 hover:bg-white/20 rounded flex justify-between items-center transition-colors"
-                                                >
-                                                    <span className="font-medium text-gray-200">{opt.label}</span>
-                                                    {opt.cost !== 0 && (
-                                                        <span className={`font-mono ${opt.cost > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                                            {opt.cost > 0 ? `-$${opt.cost}` : `+$${Math.abs(opt.cost)}`}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
+            {/* Financial overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="Current Job" value={career.jobTitle} sub={`${formatCurrency(career.salary)}/yr`} />
+                <Stat label="Education" value={career.educationLevel} tone="accent" />
+                <Stat label="Net / Month" value={formatCurrency(netMonthly)} tone={netMonthly >= 0 ? 'good' : 'bad'} />
+                <Stat label="Cash" value={formatCurrency(cash)} tone="good" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Savings goal */}
+                <Section icon={<Target size={16} className="text-emerald-400" />} title="Business Fund">
+                    <p className="text-sm text-slate-400 mb-3">
+                        Save {formatCurrency(career.savingsGoal)} to quit and launch your first business.
+                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="money text-2xl text-emerald-400">{formatCurrency(cash)}</span>
+                        <span className="text-slate-500 text-sm font-mono">/ {formatCurrency(career.savingsGoal)}</span>
+                    </div>
+                    <Bar value={savingsPercent} color="bg-gradient-to-r from-emerald-600 to-emerald-400" />
+                    <div className="text-xs text-slate-500 mt-1.5">{savingsPercent.toFixed(0)}% of the way there</div>
+                </Section>
+
+                {/* Education */}
+                <Section icon={<GraduationCap size={16} className={career.isStudying ? 'text-amber-400' : 'text-slate-400'} />} title="Education">
+                    <div className="flex justify-between text-sm mb-2">
+                        <span className="text-slate-400">Status</span>
+                        <span className={career.isStudying ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                            {career.isStudying ? 'Enrolled' : 'Not studying'}
+                        </span>
+                    </div>
+                    {career.isStudying && (
+                        <div className="mb-3">
+                            <div className="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>Degree progress</span>
+                                <span>{career.studyProgress} / 12 mo</span>
                             </div>
+                            <Bar value={(career.studyProgress / 12) * 100} color="bg-amber-400" />
+                            <div className="text-xs text-red-400 mt-1">Tuition -${career.tuitionCost}/mo</div>
                         </div>
                     )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="glass-card p-4 flex flex-col items-center">
-                            <span className="text-sm text-blue-400">Month</span>
-                            <span className="text-2xl font-bold">{month}</span>
+                    {career.educationLevel !== 'Master' ? (
+                        <button
+                            onClick={onToggleStudy}
+                            className={career.isStudying ? 'btn-danger-ghost w-full py-2.5' : 'btn-primary w-full py-2.5'}
+                        >
+                            {career.isStudying ? 'Stop studying' : 'Enroll in night classes (-$400/mo)'}
+                        </button>
+                    ) : (
+                        <div className="text-center p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm font-bold">
+                            Max education reached
                         </div>
-                        <div className="glass-card p-4 flex flex-col items-center">
-                            <span className="text-sm text-blue-400">Cash / Goal</span>
-                            <div className="flex flex-col items-center">
-                                <span className="text-2xl font-bold font-mono text-green-400">${cash.toFixed(0)}</span>
-                                <span className="text-xs text-gray-500">of ${career.savingsGoal}</span>
-                            </div>
-                        </div>
-                        <div className="glass-card p-4 flex flex-col items-center">
-                            <span className="text-sm text-blue-400">Monthly Net Income</span>
-                            <span className="text-2xl font-bold text-green-300">
-                                ${((career.salary / 12) * (1 - 0.20) - (gameState.lifestyle.rent + gameState.lifestyle.food + gameState.lifestyle.transport + gameState.lifestyle.entertainment) - (career.isStudying ? career.tuitionCost : 0)).toFixed(0)}
-                            </span>
-                        </div>
-                        <div className="glass-card p-4 flex flex-col items-center">
-                            <span className="text-sm text-blue-400">Current Job</span>
-                            <span className="text-xl font-bold text-white">{career.jobTitle}</span>
-                            <span className="text-xs text-gray-400">${(career.salary / 1000).toFixed(0)}k/yr</span>
-                        </div>
-                    </div>
+                    )}
+                    <p className="text-[11px] text-slate-500 mt-2">Higher education promotes you to better-paying jobs with 401(k) benefits.</p>
+                </Section>
+            </div>
 
-                    {/* Main Action Area */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                        {/* Career & Work Panel */}
-                        <div className="glass-panel p-6 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <Briefcase size={120} />
-                            </div>
-                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                <Briefcase className="text-blue-400" /> Active Career
-                            </h2>
-
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span>Education Level</span>
-                                    <span className="font-bold text-yellow-400">{career.educationLevel}</span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span>Monthly Gross Pay</span>
-                                    <span>${(career.salary / 12).toFixed(0)}</span>
-                                </div>
-                                {total401kContribution > 0 && (
-                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                        <span className="flex items-center gap-1">
-                                            <Shield size={14} className="text-blue-400" />
-                                            401(k) Contribution (Pre-tax)
-                                        </span>
-                                        <span className="text-blue-400">-${total401kContribution.toFixed(0)}</span>
-                                    </div>
-                                )}
-                                {totalEmployerMatch > 0 && (
-                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                        <span className="flex items-center gap-1">
-                                            <Shield size={14} className="text-emerald-400" />
-                                            Employer Match
-                                        </span>
-                                        <span className="text-emerald-400">+${totalEmployerMatch.toFixed(0)}</span>
-                                    </div>
-                                )}
-                                {totalIRAContribution > 0 && (
-                                    <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                        <span className="flex items-center gap-1">
-                                            <Shield size={14} className="text-purple-400" />
-                                            IRA Contribution (After-tax)
-                                        </span>
-                                        <span className="text-purple-400">-${totalIRAContribution.toFixed(0)}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span>Living Expenses</span>
-                                    <span className="text-red-400">-${gameState.lifestyle.rent + gameState.lifestyle.food + gameState.lifestyle.transport + gameState.lifestyle.entertainment}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Education Panel */}
-                        <div className={`glass-panel p-6 relative overflow-hidden transition-all ${career.isStudying ? 'border-yellow-500/50 bg-yellow-500/5' : ''}`}>
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                                <GraduationCap size={120} />
-                            </div>
-                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                                <GraduationCap className={career.isStudying ? "text-yellow-400" : "text-gray-400"} />
-                                Education Path
-                            </h2>
-
-                            <div className="space-y-4 mb-6">
-                                <div className="flex justify-between items-center">
-                                    <span>Status</span>
-                                    <span className={`font-bold ${career.isStudying ? 'text-green-400' : 'text-gray-500'}`}>
-                                        {career.isStudying ? 'ENROLLED' : 'NOT STUDYING'}
-                                    </span>
-                                </div>
-                                {career.isStudying && (
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span>Degree Progress</span>
-                                            <span>{career.studyProgress} / 12 mos</span>
-                                        </div>
-                                        <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                                            <div
-                                                className="bg-yellow-400 h-full transition-all duration-500"
-                                                style={{ width: `${progressPercent}%` }}
-                                            />
-                                        </div>
-                                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                            <span>Tuition Cost</span>
-                                            <span className="text-red-400">-${career.tuitionCost}/mo</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {career.educationLevel !== 'Master' ? (
+            {/* Lifestyle control (available any time you've moved out) */}
+            {lifestyle.tier !== 'Parents' && lifestyle.tier !== 'Homeless' && (
+                <Section icon={<Home size={16} className="text-blue-400" />} title="Lifestyle">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {LIFESTYLE_OPTIONS.map(tier => {
+                            const t = LIFESTYLE_TIERS[tier];
+                            const total = t.rent + t.food + t.transport + t.entertainment;
+                            const active = lifestyle.tier === tier;
+                            return (
                                 <button
-                                    onClick={onToggleStudy}
-                                    className={`w-full py-3 rounded-lg font-bold transition-all ${career.isStudying
-                                        ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/50'
-                                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/50'
-                                        }`}
+                                    key={tier}
+                                    onClick={() => !active && onUpdateLifestyle(tier)}
+                                    className={`text-left p-3 rounded-xl border transition-all ${active
+                                        ? 'border-blue-500/60 bg-blue-500/10'
+                                        : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'}`}
                                 >
-                                    {career.isStudying ? 'Stop Studying' : 'Enroll in Night Classes (-$400/mo)'}
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="font-bold text-white text-sm">{tier}</span>
+                                        {active && <span className="chip bg-blue-500/20 text-blue-300 text-[10px]">Current</span>}
+                                    </div>
+                                    <div className="money text-slate-300">{formatCurrency(total)}<span className="text-xs text-slate-500">/mo</span></div>
                                 </button>
-                            ) : (
-                                <div className="text-center p-3 bg-green-500/10 border border-green-500/30 rounded text-green-400 font-bold">
-                                    MAX EDUCATION LEVEL REACHED
-                                </div>
-                            )}
-                        </div>
+                            );
+                        })}
                     </div>
-
-                    {/* Savings Goal Progress */}
-                    <div className="glass-card p-6">
-                        <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
-                            <DollarSign className="text-green-400" /> Capital Allocation Fund
-                        </h3>
-                        <p className="text-sm text-gray-400 mb-2">Save $10,000 to quit your job and start your first business.</p>
-                        <div className="w-full bg-gray-800 h-6 rounded-full overflow-hidden relative border border-white/10">
-                            <div
-                                className="bg-gradient-to-r from-green-600 to-emerald-400 h-full transition-all duration-700 items-center justify-end flex pr-2"
-                                style={{ width: `${savingsPercent}%` }}
-                            >
-                                <span className="text-xs font-bold text-black drop-shadow-none">{savingsPercent.toFixed(1)}%</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Main Turn Projector */}
-                    <button
-                        onClick={onNextMonth}
-                        disabled={career?.pendingDecisions?.length > 0}
-                        className={`mt-4 w-full py-6 text-xl font-bold rounded-xl shadow-2xl border border-white/10 transition-all transform ${career?.pendingDecisions?.length > 0
-                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
-                            : 'bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 hover:scale-[1.01] active:scale-[0.99]'
-                            }`}
-                    >
-                        {career?.pendingDecisions?.length > 0 ? (
-                            <span className="flex items-center justify-center gap-2"><AlertCircle size={24} /> DECISION REQUIRED</span>
-                        ) : (
-                            <>PROCESS MONTH {month} <ArrowRight className="inline ml-2" size={24} /></>
-                        )}
-                    </button>
-                </>
+                    <p className="text-[11px] text-slate-500 mt-2">Nicer living recovers more energy each month but costs more.</p>
+                </Section>
             )}
         </div>
     );

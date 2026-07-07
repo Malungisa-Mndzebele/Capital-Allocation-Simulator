@@ -1,69 +1,114 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — single source of truth for the game's look.
+ * Surfaces are near-black navy; text uses three ink levels; accents are
+ * assigned by job: blue = primary/career, violet = business/market,
+ * emerald = money-positive, amber = attention/skills, red = danger.
+ */
 :root {
-    --bg-dark: #0a0b14;
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-surface: rgba(255, 255, 255, 0.03);
-    --glass-highlight: rgba(255, 255, 255, 0.05);
-    --accent-primary: #3b82f6;
-    /* Blue 500 */
-    --accent-success: #10b981;
-    --accent-danger: #ef4444;
+    --bg: #0b0d16;
+    --surface-1: rgba(255, 255, 255, 0.03);
+    --surface-2: rgba(255, 255, 255, 0.06);
+    --border-1: rgba(255, 255, 255, 0.07);
+    --border-2: rgba(255, 255, 255, 0.14);
+    --ink-1: #f1f5f9;
+    --ink-2: #94a3b8;
+    --ink-3: #64748b;
+    --accent-blue: #60a5fa;
+    --accent-violet: #a78bfa;
+    --accent-emerald: #34d399;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
 }
 
 body {
-    background-color: var(--bg-dark);
-    color: #e2e8f0;
+    background-color: var(--bg);
+    color: var(--ink-1);
     font-family: 'Inter', sans-serif;
     background-image:
-        radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.05), transparent 25%);
+        radial-gradient(circle at 12% 40%, rgba(96, 165, 250, 0.06), transparent 30%),
+        radial-gradient(circle at 88% 20%, rgba(52, 211, 153, 0.04), transparent 30%);
     min-height: 100vh;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
 }
 
 @layer utilities {
-    .glass-panel {
-        @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-xl;
+
+    /* Surfaces */
+    .panel {
+        background: var(--surface-1);
+        @apply border border-white/[0.07] rounded-2xl;
     }
 
-    .glass-card {
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
-        @apply backdrop-blur-md border border-white/5 rounded-xl shadow-lg transition-all duration-300;
+    .panel-raised {
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.02) 100%);
+        @apply border border-white/[0.07] rounded-2xl shadow-lg;
     }
 
-    .glass-card:hover {
-        @apply border-white/10 bg-white/[0.07] transform -translate-y-1 shadow-2xl shadow-blue-500/5;
+    /* Typography helpers */
+    .label {
+        @apply text-[11px] uppercase tracking-widest font-bold text-slate-500;
     }
 
-    .text-glow {
-        text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    .money {
+        @apply font-mono font-bold tracking-tight tabular-nums;
+    }
+
+    /* Buttons — shared base, then per-variant color */
+    .btn,
+    .btn-primary,
+    .btn-go,
+    .btn-ghost,
+    .btn-danger-ghost {
+        @apply inline-flex items-center justify-center gap-2 font-bold rounded-xl transition-all
+        active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
     }
 
     .btn-primary {
-        @apply bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:bg-blue-500 transition-all active:scale-95 flex items-center justify-center gap-2;
+        @apply bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40;
     }
 
-    .stat-label {
-        @apply text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1;
+    .btn-go {
+        @apply bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/40;
     }
 
-    .stat-value {
-        @apply font-mono text-2xl font-bold tracking-tight;
+    .btn-ghost {
+        @apply bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10;
+    }
+
+    .btn-danger-ghost {
+        @apply bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30;
+    }
+
+    .chip {
+        @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold;
+    }
+
+    /* Inputs */
+    .field {
+        @apply bg-black/30 border border-white/10 rounded-lg px-3 py-2 font-mono text-sm text-white
+        focus:outline-none focus:border-blue-500/60 placeholder:text-slate-600 w-full;
+    }
+
+    /* Tab buttons */
+    .tab {
+        @apply px-4 py-3 text-sm font-bold uppercase tracking-wider transition-colors border-b-2
+        border-transparent text-slate-500 hover:text-slate-300 flex items-center gap-2 whitespace-nowrap;
+    }
+
+    .tab-active {
+        @apply text-white border-blue-400;
     }
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -77,4 +122,14 @@ h6 {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
+}
+
+/* Toast slide-in */
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.toast-in {
+    animation: toast-in 200ms ease-out;
 }

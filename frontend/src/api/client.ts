@@ -34,6 +34,13 @@ export const sellAsset = async (
     return localGame.performAction(userId, 'SELL_ASSET', { assetType, amount });
 };
 
+export const resetGame = async (
+    userId: string,
+    difficulty: 'Easy' | 'Normal' | 'Hard'
+): Promise<GameState> => {
+    return localGame.performAction(userId, 'RESET', { difficulty });
+};
+
 export const api = {
     start,
     getState: getGameState,
