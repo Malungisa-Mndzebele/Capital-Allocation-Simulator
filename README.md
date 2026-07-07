@@ -128,8 +128,8 @@ Result over 15 years to retirement:
 ## 🚀 Technology Stack
 
 -   **Frontend:** React, Vite, Tailwind CSS (v4), Lightweight Charts.
--   **Backend:** Node.js, Express, TypeScript.
--   **Database:** PostgreSQL (via Prisma ORM).
+-   **Game Engine:** Pure TypeScript, runs entirely in the browser (`frontend/src/engine`).
+-   **Persistence:** Browser `localStorage` — no server or database required.
 -   **State Management:** Real-time turn-based engine.
 
 ## 🛠️ Setup & Installation
@@ -146,29 +146,19 @@ Result over 15 years to retirement:
     cd Capital-Allocation-Simulator
     ```
 
-2.  **Start the Backend:**
+2.  **Start the App:**
     ```bash
-    cd backend
+    cd frontend
     npm install
     npm run dev
     ```
-    *Server runs on port 3000.*
+    *Client runs on port 5173. The entire game runs in the browser — there is no backend to start.*
 
-3.  **Start the Frontend:**
-    ```bash
-    cd frontend
-    # npm install (if not done)
-    npm run dev
-    ```
-    *Client runs on port 5173.*
+## 🔌 Game Action Reference
 
-## 🔌 API Documentation
+The game is driven by actions dispatched to the local game service (`frontend/src/game/localGame.ts`). Each action takes a payload like the following:
 
-### Retirement Account Endpoints
-
-All retirement actions use the main game action endpoint:
-
-**POST** `/api/action`
+### Retirement Account Actions
 
 #### Open Retirement Account
 
@@ -343,7 +333,7 @@ interface GameState {
 
 ## 💻 Code Examples
 
-### Backend: Retirement Logic Implementation
+### Engine: Retirement Logic Implementation
 
 **Processing Monthly Contributions:**
 
@@ -574,8 +564,7 @@ describe('RetirementLogic', () => {
 
 ## 📦 Deployment
 
--   **Frontend:** Ready for static hosting (Spaceship, Vercel, Netlify).
--   **Backend:** Ready for Node.js hosting (Render, Railway).
+-   **Frontend:** Ready for static hosting (Spaceship, Vercel, Netlify). Build with `npm run build` in `frontend/` and deploy the `dist/` folder — no server needed.
 
 ## 🎨 Design
 

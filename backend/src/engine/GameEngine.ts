@@ -165,20 +165,23 @@ export class GameEngine {
             }
 
             // Stat Updates based on Activity
+            // Workaholic skill reduces energy drain (energy_drain bonus is negative, e.g. -0.5).
+            const energyDrainMultiplier = 1 + SkillTreeLogic.getSkillBonus(newState.skills, 'energy_drain');
+            const drain = (amount: number) => amount * energyDrainMultiplier;
             if (newState.career.jobTitle === 'Fast Food') {
                 newState.player.strength = Math.min(100, newState.player.strength + 0.2);
-                newState.player.energy = Math.max(0, newState.player.energy - 2);
+                newState.player.energy = Math.max(0, newState.player.energy - drain(2));
             } else if (newState.career.jobTitle === 'Warehouse') {
                 newState.player.strength = Math.min(100, newState.player.strength + 0.5);
-                newState.player.energy = Math.max(0, newState.player.energy - 3);
+                newState.player.energy = Math.max(0, newState.player.energy - drain(3));
             } else if (newState.career.jobTitle === 'Sales') {
                 newState.player.wisdom = Math.min(100, newState.player.wisdom + 0.3);
-                newState.player.energy = Math.max(0, newState.player.energy - 3);
+                newState.player.energy = Math.max(0, newState.player.energy - drain(3));
             }
 
             if (newState.career.isStudying) {
                 newState.player.intelligence = Math.min(100, newState.player.intelligence + 0.5);
-                newState.player.energy = Math.max(0, newState.player.energy - 1);
+                newState.player.energy = Math.max(0, newState.player.energy - drain(1));
             }
 
             // Energy recovery
@@ -247,7 +250,8 @@ export class GameEngine {
             // Process retirement contributions (pre-tax for 401k and Traditional IRA)
             let totalRetirementContributions = 0;
             let totalEmployerMatch = 0;
-            
+            let monthlyPreTaxContributions = 0; // this month's pre-tax employee contributions
+
             // Process active retirement accounts
             const activeAccounts = newState.retirement.accounts.filter(acc => acc.isActive);
             for (const account of activeAccounts) {
@@ -258,7 +262,7 @@ export class GameEngine {
                         account.contributionRate,
                         account.type
                     );
-                    
+
                     // Process contribution with limit enforcement
                     const result = RetirementLogic.processContribution(
                         account,
@@ -266,15 +270,20 @@ export class GameEngine {
                         contribution,
                         newState.player.age
                     );
-                    
+
                     // Update account in state
                     const accountIndex = newState.retirement.accounts.findIndex(a => a.id === account.id);
                     if (accountIndex !== -1) {
                         newState.retirement.accounts[accountIndex] = result.account;
                     }
                     newState.retirement = result.state;
-                    
+
                     totalRetirementContributions += result.actualContribution;
+
+                    // 401(k), Traditional IRA and Solo 401(k) contributions are pre-tax
+                    if (account.type === '401k' || account.type === 'traditional_ira' || account.type === 'solo_401k') {
+                        monthlyPreTaxContributions += result.actualContribution;
+                    }
                     
                     // Calculate and add employer match for 401k
                     if (account.type === '401k' && result.actualContribution > 0) {
@@ -298,16 +307,9 @@ export class GameEngine {
                 }
             }
             
-            // Calculate taxable income (after pre-tax retirement contributions)
-            // 401k and Traditional IRA contributions are pre-tax
-            const preTaxContributions = newState.retirement.accounts
-                .filter(acc => acc.isActive && (acc.type === '401k' || acc.type === 'traditional_ira'))
-                .reduce((sum, acc) => {
-                    const accountIndex = newState.retirement.accounts.findIndex(a => a.id === acc.id);
-                    return sum + (newState.retirement.accounts[accountIndex].annualContributions / 12);
-                }, 0);
-            
-            const taxableIncome = adjustedGrossMonthly - preTaxContributions;
+            // Taxable income is this month's gross minus this month's pre-tax contributions.
+            // (Using YTD annualContributions/12 here would under-deduct early in each year.)
+            const taxableIncome = adjustedGrossMonthly - monthlyPreTaxContributions;
             const tax = taxableIncome * TAX_RATE;
             const tuition = newState.career.isStudying ? newState.career.tuitionCost : 0;
             
@@ -381,13 +383,6 @@ export class GameEngine {
                 newState.gameOver = true;
                 newState.gameOverReason = "You have been homeless and broke for too long. Game Over.";
             }
-            
-            // Retirement check (age 65)
-            if (newState.player.age >= 65) {
-                newState.gameOver = true;
-                const retirementScore = this.calculateRetirementScore(newState);
-                newState.gameOverReason = `Retirement at age 65! Final Net Worth: $${newState.netWorth.toFixed(0)}. Retirement Score: ${retirementScore}/100`;
-            }
 
             // Level up logic...
             if (newState.cash >= newState.career.savingsGoal) {
@@ -430,7 +425,39 @@ export class GameEngine {
             const passiveIncome = SkillTreeLogic.getPassiveIncome(newState.skills);
             
             newState.cash += monthlyProfit + passiveIncome;
-            
+
+            // Retirement contributions from business income (Solo 401(k) and IRAs).
+            // Business profit is the income base; there is no employer match or
+            // income-tax interaction modelled at this level. Employer-only 401(k)
+            // accounts are skipped since the player no longer has an employer.
+            const businessIncome = Math.max(0, monthlyProfit);
+            if (businessIncome > 0) {
+                let totalBusinessContributions = 0;
+                const contributingAccounts = newState.retirement.accounts.filter(
+                    acc => acc.isActive && acc.contributionRate > 0 && acc.type !== '401k'
+                );
+                for (const account of contributingAccounts) {
+                    const contribution = RetirementLogic.calculateContribution(
+                        businessIncome, account.contributionRate, account.type
+                    );
+                    const result = RetirementLogic.processContribution(
+                        account, newState.retirement, contribution, newState.player.age
+                    );
+                    const idx = newState.retirement.accounts.findIndex(a => a.id === account.id);
+                    if (idx !== -1) newState.retirement.accounts[idx] = result.account;
+                    newState.retirement = result.state;
+                    totalBusinessContributions += result.actualContribution;
+                }
+                if (totalBusinessContributions > 0) {
+                    newState.cash -= totalBusinessContributions;
+                    newState.events.push({
+                        month: newState.month,
+                        description: 'Retirement Contributions',
+                        impact: `Contributed $${totalBusinessContributions.toFixed(0)} from business income`
+                    });
+                }
+            }
+
             // Random business events (20% chance per month)
             if (Math.random() < 0.2) {
                 const businessEvents = [
@@ -472,18 +499,22 @@ export class GameEngine {
             const oldPortfolio = { ...newState.portfolio };
             newState.portfolio = InvestmentLogic.processMonth(newState.portfolio, newState.market, oldMarketIndex);
             
-            // Apply investment skill bonuses
+            // Apply investment skill bonuses.
+            // investment_returns (Investor/Hedge Fund) amplifies gains/losses;
+            // volatility reduction (Diversification) dampens the monthly swing.
             const investmentReturnBonus = SkillTreeLogic.getSkillBonus(newState.skills, 'investment_returns');
-            if (investmentReturnBonus !== 0) {
+            const volatilityReduction = -SkillTreeLogic.getSkillBonus(newState.skills, 'volatility'); // bonus is negative
+            const gainAdjustment = investmentReturnBonus - volatilityReduction;
+            if (gainAdjustment !== 0) {
                 // Calculate the gains/losses from this month
                 const stockGain = newState.portfolio.stocksValue - oldPortfolio.stocksValue;
                 const bondGain = newState.portfolio.bondsValue - oldPortfolio.bondsValue;
                 const realEstateGain = newState.portfolio.realEstateValue - oldPortfolio.realEstateValue;
-                
-                // Apply bonus to gains (or reduce losses)
-                newState.portfolio.stocksValue += stockGain * investmentReturnBonus;
-                newState.portfolio.bondsValue += bondGain * investmentReturnBonus;
-                newState.portfolio.realEstateValue += realEstateGain * investmentReturnBonus;
+
+                // Amplify by the return bonus and dampen by the volatility reduction
+                newState.portfolio.stocksValue += stockGain * gainAdjustment;
+                newState.portfolio.bondsValue += bondGain * gainAdjustment;
+                newState.portfolio.realEstateValue += realEstateGain * gainAdjustment;
             }
 
             const investmentIncome = newState.portfolio.cash;
@@ -497,23 +528,22 @@ export class GameEngine {
                     impact: `Received $${investmentIncome.toFixed(2)}`
                 });
             }
-            
-            // Apply inflation to expenses (annual adjustment)
-            if (newState.month % 12 === 0 && newState.month > 1) {
-                const inflationRate = newState.market.inflationRate;
-                
-                // Increase lifestyle costs
-                newState.lifestyle.rent = Math.round(newState.lifestyle.rent * (1 + inflationRate));
-                newState.lifestyle.food = Math.round(newState.lifestyle.food * (1 + inflationRate));
-                newState.lifestyle.transport = Math.round(newState.lifestyle.transport * (1 + inflationRate));
-                newState.lifestyle.entertainment = Math.round(newState.lifestyle.entertainment * (1 + inflationRate));
-                
-                newState.events.push({
-                    month: newState.month,
-                    description: 'Annual Inflation Adjustment',
-                    impact: `Living costs increased by ${(inflationRate * 100).toFixed(1)}%`
-                });
-            }
+        }
+
+        // Apply inflation to lifestyle costs (annual adjustment) — applies in every level
+        if (newState.month % 12 === 0 && newState.month > 1) {
+            const inflationRate = newState.market.inflationRate;
+
+            newState.lifestyle.rent = Math.round(newState.lifestyle.rent * (1 + inflationRate));
+            newState.lifestyle.food = Math.round(newState.lifestyle.food * (1 + inflationRate));
+            newState.lifestyle.transport = Math.round(newState.lifestyle.transport * (1 + inflationRate));
+            newState.lifestyle.entertainment = Math.round(newState.lifestyle.entertainment * (1 + inflationRate));
+
+            newState.events.push({
+                month: newState.month,
+                description: 'Annual Inflation Adjustment',
+                impact: `Living costs increased by ${(inflationRate * 100).toFixed(1)}%`
+            });
         }
 
         // Net Worth (Universal) — includes business value estimate, retirement accounts, minus debt
@@ -536,6 +566,13 @@ export class GameEngine {
             month: newState.month,
             value: newState.netWorth
         });
+
+        // Retirement check (age 65) — applies in every level, not just Career
+        if (newState.player.age >= 65 && !newState.gameOver) {
+            newState.gameOver = true;
+            const retirementScore = this.calculateRetirementScore(newState);
+            newState.gameOverReason = `Retirement at age 65! Final Net Worth: $${newState.netWorth.toFixed(0)}. Retirement Score: ${retirementScore}/100`;
+        }
 
         // Check for new achievements
         const newAchievements = checkAchievements(newState, newState.achievements);

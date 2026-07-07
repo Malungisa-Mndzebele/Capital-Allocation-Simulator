@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { PlusCircle, TrendingDown, AlertTriangle, DollarSign, Info } from 'lucide-react';
-import type { RetirementState, CareerState, BusinessState } from '../types';
+import type { RetirementState, CareerState, BusinessState, GameLevel } from '../types';
 
 interface RetirementActionsProps {
     retirement: RetirementState;
     career: CareerState;
     business: BusinessState;
+    level?: GameLevel;
     playerAge: number;
     cash: number;
     onOpenAccount: (accountType: string) => void;

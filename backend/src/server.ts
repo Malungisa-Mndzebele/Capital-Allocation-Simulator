@@ -327,14 +327,17 @@ app.post('/api/game/action', async (req: Request, res: Response) => {
                 return res.status(400).json({ error: 'Insufficient savings to start a business' });
             }
             state.level = 'Business';
-            state.cash -= BUSINESS_STARTUP_COST;
+            // Entrepreneur skill reduces startup cost (business_startup bonus is negative, e.g. -0.2).
+            const startupReduction = SkillTreeLogic.getSkillBonus(state.skills, 'business_startup');
+            const startupCost = Math.round(BUSINESS_STARTUP_COST * (1 + startupReduction));
+            state.cash -= startupCost;
             const defaults = BUSINESS_DEFAULTS[businessType];
             state.business.type = businessType as any;
             state.business.inventory = defaults.inventory;
             state.business.capacity = defaults.capacity;
             state.business.prices = defaults.prices;
             state.business.demand = defaults.demand;
-            state.events.push({ month: state.month, description: 'BUSINESS LAUNCHED', impact: `You have resigned to start a ${businessType} business.` });
+            state.events.push({ month: state.month, description: 'BUSINESS LAUNCHED', impact: `You have resigned to start a ${businessType} business. Startup cost: $${startupCost}.` });
             
             // Update personality
             state.player = PersonalityLogic.updatePersonality(state.player, 'START_BUSINESS', { businessType });
