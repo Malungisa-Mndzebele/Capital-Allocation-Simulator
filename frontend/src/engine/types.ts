@@ -46,6 +46,7 @@ export interface GameState {
     business: BusinessState; // Level 2 specific
     portfolio: PortfolioState; // Level 3 specific
     retirement: RetirementState; // Retirement accounts
+    luxury: LuxuryState; // Big-ticket toys and monthly indulgences
     market: MarketState;
     events: EventLog[];
     achievements: Achievement[];
@@ -56,6 +57,23 @@ export interface GameState {
     activeScenario: string | null;
     gameOver: boolean;
     gameOverReason?: string;
+}
+
+export type LuxuryKind = 'depreciating' | 'appreciating' | 'consumable';
+
+// A big-ticket item the player owns (jet, yacht, island, ...).
+export interface LuxuryAsset {
+    id: string; // unique instance id
+    type: string; // catalog id (see LUXURY_CATALOG)
+    name: string;
+    purchasePrice: number;
+    currentValue: number; // drifts down (depreciating) or up (appreciating) each month
+    purchaseMonth: number;
+}
+
+export interface LuxuryState {
+    ownedAssets: LuxuryAsset[];
+    subscriptions: string[]; // active monthly-indulgence ids (see LUXURY_SUBSCRIPTIONS)
 }
 
 export interface NetWorthDataPoint {

@@ -4,7 +4,7 @@ import type { GameState, EventLog } from './types'
 import { getGameState, nextTurn, performAction, resetGame } from './api/client'
 import {
     Briefcase, Zap, Shield, Trophy, TrendingUp, Landmark,
-    ArrowRight, AlertCircle, Rocket, RotateCcw, Target, BookOpen, Sparkles,
+    ArrowRight, AlertCircle, Rocket, RotateCcw, Target, BookOpen, Sparkles, Gem,
 } from 'lucide-react'
 
 import { PlayerSidebar } from './components/PlayerSidebar'
@@ -26,11 +26,12 @@ import { RetirementTutorial } from './components/RetirementTutorial'
 import { RetirementNotifications } from './components/RetirementNotifications'
 import { GameOverScreen } from './components/GameOverScreen'
 import { NewGameModal } from './components/NewGameModal'
+import { LuxuryPanel } from './components/LuxuryPanel'
 import { formatCurrency, formatCompact, Modal, ToastStack, type ToastMessage } from './components/ui'
 
 const userId = 'user_123'
 const HISTORY_CAP = 250
-type Tab = 'game' | 'finance' | 'retirement' | 'skills' | 'progress'
+type Tab = 'game' | 'finance' | 'luxury' | 'retirement' | 'skills' | 'progress'
 type Difficulty = 'Easy' | 'Normal' | 'Hard'
 
 const BUSINESS_TYPES = [
@@ -176,9 +177,11 @@ function App() {
     const ageProgress = ((gameState.player.age - 17) / (65 - 17)) * 100
     const retirementCount = gameState.retirement.accounts.length
 
+    const luxuryCount = gameState.luxury?.ownedAssets?.length || 0
     const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
         { id: 'game', label: 'Game', icon: level === 'Career' ? <Briefcase size={14} /> : <TrendingUp size={14} /> },
         { id: 'finance', label: 'Finance', icon: <Landmark size={14} /> },
+        { id: 'luxury', label: 'Luxury', icon: <Gem size={14} />, badge: luxuryCount || undefined, badgeColor: 'bg-violet-500/30 text-violet-300' },
         { id: 'retirement', label: 'Retirement', icon: <Shield size={14} />, badge: retirementCount || undefined, badgeColor: 'bg-emerald-500/30 text-emerald-300' },
         { id: 'skills', label: 'Skills', icon: <Sparkles size={14} />, badge: gameState.skills.skillPoints || undefined, badgeColor: 'bg-amber-500/30 text-amber-300' },
         { id: 'progress', label: 'Progress', icon: <Trophy size={14} /> },
@@ -279,6 +282,15 @@ function App() {
                                 onPayLoan={(loanId, amount) => act('PAY_LOAN', { loanId, amount })}
                                 onBuyAsset={(assetType, amount) => act('BUY_ASSET', { assetType, amount })}
                                 onSellAsset={(assetType, amount) => act('SELL_ASSET', { assetType, amount })}
+                            />
+                        )}
+
+                        {activeTab === 'luxury' && (
+                            <LuxuryPanel
+                                gameState={gameState}
+                                onBuyLuxury={itemId => act('BUY_LUXURY', { itemId })}
+                                onSellLuxury={assetId => act('SELL_LUXURY', { assetId })}
+                                onToggleSubscription={subId => act('TOGGLE_SUBSCRIPTION', { subId })}
                             />
                         )}
 

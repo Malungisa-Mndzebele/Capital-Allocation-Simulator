@@ -145,11 +145,23 @@ export const ACHIEVEMENTS: AchievementCheck[] = [
         description: 'Accumulate $1,000,000 in retirement accounts',
         check: (state) => {
             const totalRetirementBalance = state.retirement.accounts.reduce(
-                (sum: number, account: any) => sum + account.balance, 
+                (sum: number, account: any) => sum + account.balance,
                 0
             );
             return totalRetirementBalance >= 1000000;
         }
+    },
+    {
+        id: 'baller',
+        title: 'Baller',
+        description: 'Own a private jet',
+        check: (state) => (state.luxury?.ownedAssets || []).some((a: any) => a.type === 'jet')
+    },
+    {
+        id: 'island_life',
+        title: 'Island Life',
+        description: 'Own a private island',
+        check: (state) => (state.luxury?.ownedAssets || []).some((a: any) => a.type === 'island')
     }
 ];
 

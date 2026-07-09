@@ -7,12 +7,13 @@ import type { GameState } from '../engine/types';
 import {
     SALARIES, LIFESTYLE_TIERS, BUSINESS_STARTUP_COST, BUSINESS_DEFAULTS, TUITION_COST,
     VALID_ACTIONS, VALID_ASSET_TYPES, VALID_LIFESTYLE_TIERS, VALID_JOB_TITLES, VALID_BUSINESS_TYPES,
-    VALID_LOAN_TYPES, MAX_LOAN_AMOUNTS,
+    VALID_LOAN_TYPES, MAX_LOAN_AMOUNTS, LUXURY_CATALOG, LUXURY_SUBSCRIPTIONS,
 } from '../engine/config';
 import { LoanLogic } from '../engine/systems/LoanLogic';
 import { CareerLogic } from '../engine/systems/CareerLogic';
 import { PersonalityLogic } from '../engine/systems/PersonalityLogic';
 import { SkillTreeLogic, SKILL_TREE } from '../engine/systems/SkillTreeLogic';
+import { LuxuryLogic } from '../engine/systems/LuxuryLogic';
 import { ChallengeMode, CHALLENGES } from '../engine/systems/ChallengeMode';
 import { ScenarioMode, SCENARIOS } from '../engine/systems/ScenarioMode';
 import { RetirementLogic } from '../engine/systems/RetirementLogic';
@@ -622,6 +623,95 @@ export function performAction(userId: string, action: string, payload?: Record<s
                 month: state.month,
                 description: '⚠️ Early Withdrawal Penalty',
                 impact: 'Withdrawing before age 59.5 incurs a 10% penalty plus taxes'
+            });
+        }
+    }
+
+    // --- BUY_LUXURY ---
+    if (action === 'BUY_LUXURY') {
+        state.luxury = LuxuryLogic.normalize(state.luxury);
+        const itemId = payload?.itemId;
+        const def = LUXURY_CATALOG.find(l => l.id === itemId);
+        if (!def) {
+            throw new Error('Invalid luxury item');
+        }
+        if (state.cash < def.cost) {
+            throw new Error('Insufficient cash for this purchase');
+        }
+
+        state.cash -= def.cost;
+        state.player.happiness = Math.min(100, state.player.happiness + def.happiness);
+
+        // Experiences are pure consumption — no owned asset, no resale.
+        if (def.kind !== 'consumable') {
+            state.luxury.ownedAssets.push({
+                id: `lux_${def.id}_${Date.now()}`,
+                type: def.id,
+                name: def.name,
+                purchasePrice: def.cost,
+                currentValue: def.cost,
+                purchaseMonth: state.month,
+            });
+        }
+
+        state.events.push({
+            month: state.month,
+            description: `${def.icon} Purchased ${def.name}`,
+            impact: def.kind === 'consumable'
+                ? `-$${def.cost.toLocaleString()}. An experience of a lifetime!`
+                : `-$${def.cost.toLocaleString()}. Upkeep $${def.upkeep.toLocaleString()}/mo.`
+        });
+    }
+
+    // --- SELL_LUXURY ---
+    if (action === 'SELL_LUXURY') {
+        state.luxury = LuxuryLogic.normalize(state.luxury);
+        const assetId = payload?.assetId;
+        if (!isString(assetId)) {
+            throw new Error('assetId is required');
+        }
+        const idx = state.luxury.ownedAssets.findIndex(a => a.id === assetId);
+        if (idx === -1) {
+            throw new Error('Luxury item not found');
+        }
+        const asset = state.luxury.ownedAssets[idx];
+        const def = LUXURY_CATALOG.find(l => l.id === asset.type);
+        // Real estate sells near value; toys take a resale haircut.
+        const resaleFactor = def?.kind === 'appreciating' ? 0.95 : 0.85;
+        const proceeds = Math.round(asset.currentValue * resaleFactor);
+
+        state.cash += proceeds;
+        state.luxury.ownedAssets.splice(idx, 1);
+
+        state.events.push({
+            month: state.month,
+            description: `Sold ${asset.name}`,
+            impact: `+$${proceeds.toLocaleString()} (${Math.round((1 - resaleFactor) * 100)}% resale cost)`
+        });
+    }
+
+    // --- TOGGLE_SUBSCRIPTION ---
+    if (action === 'TOGGLE_SUBSCRIPTION') {
+        state.luxury = LuxuryLogic.normalize(state.luxury);
+        const subId = payload?.subId;
+        const sub = LUXURY_SUBSCRIPTIONS.find(s => s.id === subId);
+        if (!sub) {
+            throw new Error('Invalid subscription');
+        }
+        const existing = state.luxury.subscriptions.indexOf(sub.id);
+        if (existing === -1) {
+            state.luxury.subscriptions.push(sub.id);
+            state.events.push({
+                month: state.month,
+                description: `${sub.icon} Subscribed: ${sub.name}`,
+                impact: `-$${sub.monthlyCost.toLocaleString()}/mo`
+            });
+        } else {
+            state.luxury.subscriptions.splice(existing, 1);
+            state.events.push({
+                month: state.month,
+                description: `Cancelled: ${sub.name}`,
+                impact: `Saving $${sub.monthlyCost.toLocaleString()}/mo`
             });
         }
     }

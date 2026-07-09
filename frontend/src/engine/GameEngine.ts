@@ -7,6 +7,7 @@ import { LoanLogic } from './systems/LoanLogic';
 import { RetirementLogic } from './systems/RetirementLogic';
 import { PersonalityLogic } from './systems/PersonalityLogic';
 import { SkillTreeLogic } from './systems/SkillTreeLogic';
+import { LuxuryLogic } from './systems/LuxuryLogic';
 import { ChallengeMode, CHALLENGES } from './systems/ChallengeMode';
 import { ScenarioMode, SCENARIOS } from './systems/ScenarioMode';
 import { TAX_RATE, RELATIONSHIP_COSTS, CHILD_COST_PER_MONTH, LIFESTYLE_TIERS, RETIREMENT_LIMITS } from './config';
@@ -102,10 +103,27 @@ export class GameEngine {
             });
         }
 
+        // Luxury: monthly upkeep on owned toys, subscription fees, and the
+        // stat boosts from active indulgences. Asset values also drift here.
+        const luxuryResult = LuxuryLogic.processMonth(newState.luxury, newState.market);
+        newState.luxury = luxuryResult.luxury;
+        if (luxuryResult.happiness) newState.player.happiness = Math.min(100, Math.max(0, newState.player.happiness + luxuryResult.happiness));
+        if (luxuryResult.energy) newState.player.energy = Math.min(100, Math.max(0, newState.player.energy + luxuryResult.energy));
+        if (luxuryResult.strength) newState.player.strength = Math.min(100, Math.max(0, newState.player.strength + luxuryResult.strength));
+
         const totalExpenses = adjustedLifestyleCosts +
             adjustedRelationshipCost +
             childCost +
-            loanPayment;
+            loanPayment +
+            luxuryResult.monthlyCost;
+
+        if (luxuryResult.monthlyCost > 0) {
+            newState.events.push({
+                month: newState.month,
+                description: 'Luxury Upkeep',
+                impact: `-$${Math.round(luxuryResult.monthlyCost).toLocaleString()} on toys & indulgences`
+            });
+        }
 
         // Pregnancy Progression
         if (newState.player.isPregnant) {
@@ -551,12 +569,14 @@ export class GameEngine {
             : 0;
         const totalDebt = newState.loans.reduce((sum, loan) => sum + loan.balance, 0);
         const totalRetirementBalance = newState.retirement.accounts.reduce((sum, account) => sum + account.balance, 0);
-        
+        const luxuryValue = LuxuryLogic.totalValue(newState.luxury);
+
         newState.netWorth = newState.cash +
             newState.portfolio.stocksValue +
             newState.portfolio.bondsValue +
             newState.portfolio.realEstateValue +
             totalRetirementBalance +
+            luxuryValue +
             businessValue -
             totalDebt;
         
@@ -792,6 +812,10 @@ export class GameEngine {
                 currentYearContributions401k: 0,
                 currentYearContributionsIRA: 0,
                 lastResetYear: 1 // Start at year 1 (month 1-12)
+            },
+            luxury: {
+                ownedAssets: [],
+                subscriptions: []
             },
             market: {
                 cycleStage: 'Recovery',
